@@ -2,13 +2,13 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: igu-config
+  name: guard-config
   namespace: guard-system
   labels:
     app.kubernetes.io/name: guard
     app.kubernetes.io/component: automation
 data:
-  # Add your IGU configuration here
+  # Add your GUARD configuration here
   # Example:
   # config.yaml: |
   #   clusters:

@@ -1,8 +1,8 @@
-"""Custom exceptions for IGU."""
+"""Custom exceptions for GUARD."""
 
 
 class IguError(Exception):
-    """Base exception for all IGU errors."""
+    """Base exception for all GUARD errors."""
 
 
 class ConfigurationError(IguError):

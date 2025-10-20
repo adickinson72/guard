@@ -1,4 +1,4 @@
-"""Core data models for IGU."""
+"""Core data models for GUARD."""
 
 from datetime import datetime
 from enum import Enum

@@ -1,4 +1,4 @@
-"""Configuration management for IGU."""
+"""Configuration management for GUARD."""
 
 from pathlib import Path
 from typing import Any
@@ -18,14 +18,14 @@ class AWSConfig(BaseModel):
     class DynamoDBConfig(BaseModel):
         """DynamoDB configuration."""
 
-        table_name: str = "igu-cluster-registry"
+        table_name: str = "guard-cluster-registry"
         region: str = "us-east-1"
 
     class SecretsManagerConfig(BaseModel):
         """Secrets Manager configuration."""
 
-        gitlab_token_secret: str = "igu/gitlab-token"
-        datadog_credentials_secret: str = "igu/datadog-credentials"
+        gitlab_token_secret: str = "guard/gitlab-token"
+        datadog_credentials_secret: str = "guard/datadog-credentials"
 
     dynamodb: DynamoDBConfig = Field(default_factory=DynamoDBConfig)
     secrets_manager: SecretsManagerConfig = Field(default_factory=SecretsManagerConfig)
@@ -131,7 +131,7 @@ class LLMConfig(BaseModel):
     enabled: bool = False
     provider: str = "openai"
     model: str = "gpt-4"
-    api_key_secret: str = "igu/llm-api-key"
+    api_key_secret: str = "guard/llm-api-key"
 
 
 class BatchConfig(BaseModel):
@@ -151,7 +151,7 @@ class LoggingConfig(BaseModel):
 
 
 class IguConfig(BaseModel):
-    """Main IGU configuration."""
+    """Main GUARD configuration."""
 
     aws: AWSConfig
     gitlab: GitLabConfig

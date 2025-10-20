@@ -1,4 +1,4 @@
-"""Interface definitions for IGU black box design."""
+"""Interface definitions for GUARD black box design."""
 
 from guard.interfaces.check import Check, CheckContext
 from guard.interfaces.cloud_provider import CloudProvider

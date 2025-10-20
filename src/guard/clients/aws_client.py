@@ -55,7 +55,7 @@ class AWSClient:
             AWSError: If role assumption fails
         """
         if not session_name:
-            session_name = "IGU-Session"
+            session_name = "GUARD-Session"
 
         try:
             logger.info("assuming_role", role_arn=role_arn, session_name=session_name)

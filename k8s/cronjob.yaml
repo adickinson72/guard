@@ -2,7 +2,7 @@
 apiVersion: batch/v1
 kind: CronJob
 metadata:
-  name: igu-scheduled-upgrade
+  name: guard-scheduled-upgrade
   namespace: guard-system
   labels:
     app.kubernetes.io/name: guard
@@ -27,7 +27,7 @@ spec:
             app.kubernetes.io/name: guard
             app.kubernetes.io/component: automation
         spec:
-          serviceAccountName: igu
+          serviceAccountName: guard
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
@@ -37,10 +37,10 @@ spec:
           containers:
           - name: guard
             # Replace with your container registry and image tag
-            image: <YOUR_REGISTRY>/igu:latest
+            image: <YOUR_REGISTRY>/guard:latest
             imagePullPolicy: Always
             # Example command - adjust based on your requirements
-            command: ["igu"]
+            command: ["guard"]
             args:
             - "run"
             - "--batch"
@@ -74,5 +74,5 @@ spec:
           volumes:
           - name: config
             configMap:
-              name: igu-config
+              name: guard-config
           restartPolicy: Never
