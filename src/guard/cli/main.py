@@ -1,4 +1,4 @@
-"""Main CLI entry point for IGU."""
+"""Main CLI entry point for GUARD."""
 
 import click
 from rich.console import Console
@@ -6,6 +6,15 @@ from rich.console import Console
 from guard import __version__
 
 console = Console()
+
+LOGO = """
+  ________ ____ ___  _____ __________________
+ /  _____/|    |   \/  _  \\______   \______ \\
+/   \  ___|    |   /  /_\  \|       _/|    |  \\
+\    \_\  \    |  /    |    \    |   \|    `   \\
+ \______  /______/\____|__  /____|_  /_______  /
+        \/                \/       \/        \/
+"""
 
 
 @click.group()
@@ -18,7 +27,11 @@ console = Console()
 )
 @click.pass_context
 def cli(ctx: click.Context, config: str) -> None:
-    """Istio GitOps Upgrader (IGU) - Automate safe Istio upgrades."""
+    """GitOps Upgrade Automation with Rollback Detection (GUARD) - Automate safe Istio upgrades."""
+    # Display logo
+    console.print(f"[bold cyan]{LOGO}[/bold cyan]", highlight=False)
+    console.print(f"[bold]v{__version__}[/bold]\n")
+
     ctx.ensure_object(dict)
     ctx.obj["config"] = config
 
@@ -50,7 +63,7 @@ def run(ctx: click.Context, batch: str, target_version: str, dry_run: bool, max_
 
     logger = get_logger(__name__)
 
-    console.print(f"[bold blue]IGU Run Command[/bold blue]")
+    console.print(f"[bold blue]GUARD Run Command[/bold blue]")
     console.print(f"Batch: {batch}")
     console.print(f"Target Version: {target_version}")
     console.print(f"Dry Run: {dry_run}")
@@ -252,7 +265,7 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
 
     logger = get_logger(__name__)
 
-    console.print(f"[bold green]IGU Monitor Command[/bold green]")
+    console.print(f"[bold green]GUARD Monitor Command[/bold green]")
     console.print(f"Batch: {batch}")
     console.print(f"Soak Period: {soak_period} minutes\n")
 
@@ -420,7 +433,7 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
 
     logger = get_logger(__name__)
 
-    console.print(f"[bold red]IGU Rollback Command[/bold red]")
+    console.print(f"[bold red]GUARD Rollback Command[/bold red]")
     console.print(f"Batch: {batch}")
     console.print(f"Reason: {reason}\n")
 
@@ -513,7 +526,7 @@ def list_clusters(
     from guard.registry.cluster_registry import ClusterRegistry
     from guard.adapters.dynamodb_adapter import DynamoDBAdapter
 
-    console.print(f"[bold cyan]IGU List Command[/bold cyan]")
+    console.print(f"[bold cyan]GUARD List Command[/bold cyan]")
     console.print(f"Batch Filter: {batch or 'All'}")
     console.print(f"Environment Filter: {environment or 'All'}\n")
 
@@ -546,7 +559,7 @@ def list_clusters(
                 cluster_dicts = [c.model_dump() for c in clusters]
                 print(json.dumps(cluster_dicts, indent=2, default=str))
             else:
-                table = Table(title=f"IGU Clusters ({len(clusters)} total)")
+                table = Table(title=f"GUARD Clusters ({len(clusters)} total)")
                 table.add_column("Cluster ID", style="cyan")
                 table.add_column("Batch", style="magenta")
                 table.add_column("Environment", style="blue")
@@ -589,7 +602,7 @@ def validate(ctx: click.Context) -> None:
     from guard.adapters.gitlab_adapter import GitLabAdapter
     from guard.adapters.aws_adapter import AWSAdapter
 
-    console.print(f"[bold magenta]IGU Validate Command[/bold magenta]\n")
+    console.print(f"[bold magenta]GUARD Validate Command[/bold magenta]\n")
 
     async def _validate():
         try:
