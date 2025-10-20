@@ -3,7 +3,7 @@
 import click
 from rich.console import Console
 
-from igu import __version__
+from guard import __version__
 
 console = Console()
 
@@ -13,7 +13,7 @@ console = Console()
 @click.option(
     "--config",
     type=click.Path(exists=True),
-    default="~/.igu/config.yaml",
+    default="~/.guard/config.yaml",
     help="Path to configuration file",
 )
 @click.pass_context
