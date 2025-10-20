@@ -88,6 +88,8 @@ class ValidationThresholds(BaseModel):
 
     Thresholds based on industry best practices for production Istio upgrades.
     All percentage values represent maximum acceptable increases from baseline.
+
+    Can be overridden per-environment or per-batch via configuration.
     """
 
     # Latency thresholds (percentage increase from baseline)
@@ -112,6 +114,92 @@ class ValidationThresholds(BaseModel):
     # Pilot/control plane error thresholds
     pilot_xds_reject_threshold: int = 10  # Max rejected xDS pushes
     pilot_push_error_rate_max: float = 0.01  # 1% max push error rate
+
+    # Environment-specific overrides (optional)
+    environment_overrides: dict[str, "ValidationThresholds"] = Field(default_factory=dict)
+
+    def get_for_environment(self, environment: str) -> "ValidationThresholds":
+        """Get thresholds for a specific environment.
+
+        Args:
+            environment: Environment name (dev, staging, production)
+
+        Returns:
+            ValidationThresholds (with overrides applied if present)
+        """
+        if environment in self.environment_overrides:
+            # Merge overrides with base thresholds
+            base_dict = self.model_dump(exclude={"environment_overrides"})
+            override = self.environment_overrides[environment]
+            override_dict = override.model_dump(
+                exclude_unset=True, exclude={"environment_overrides"}
+            )
+
+            # Apply overrides
+            merged = {**base_dict, **override_dict}
+            return ValidationThresholds(**merged)
+
+        return self
+
+
+class MetricAggregation(str, Enum):
+    """Metric aggregation types."""
+
+    AVG = "avg"
+    MAX = "max"
+    MIN = "min"
+    P95 = "p95"
+    P99 = "p99"
+    SUM = "sum"
+
+
+# Metric name to aggregation mapping for proper metric queries
+METRIC_AGGREGATIONS: dict[str, MetricAggregation] = {
+    # Latency metrics - use percentiles
+    "istio.request.duration.p95": MetricAggregation.P95,
+    "istio.request.duration.p99": MetricAggregation.P99,
+    "http.latency.p95": MetricAggregation.P95,
+    "http.latency.p99": MetricAggregation.P99,
+    "latency.p95": MetricAggregation.P95,
+    "latency.p99": MetricAggregation.P99,
+    # Error rates - use max to catch spikes
+    "istio.request.error_rate": MetricAggregation.MAX,
+    "http.error_rate": MetricAggregation.MAX,
+    "error.rate": MetricAggregation.MAX,
+    "error_rate": MetricAggregation.MAX,
+    # Request counts - use sum for totals
+    "istio.request.count": MetricAggregation.SUM,
+    "http.request_count": MetricAggregation.SUM,
+    "request.count": MetricAggregation.SUM,
+    # Resource metrics - use avg
+    "istiod.cpu": MetricAggregation.AVG,
+    "istiod.memory": MetricAggregation.AVG,
+    "istiod.cpu_usage": MetricAggregation.AVG,
+    "istiod.mem_usage": MetricAggregation.AVG,
+    "gateway.cpu": MetricAggregation.AVG,
+    "gateway.memory": MetricAggregation.AVG,
+    "gateway.cpu_usage": MetricAggregation.AVG,
+    "gateway.mem_usage": MetricAggregation.AVG,
+    "cpu.usage": MetricAggregation.AVG,
+    "memory.usage": MetricAggregation.AVG,
+    # Pilot metrics - use sum for counts, max for rates
+    "pilot_total_xds_rejects": MetricAggregation.SUM,
+    "pilot.xds.rejects": MetricAggregation.SUM,
+    "pilot_xds_push_errors": MetricAggregation.MAX,
+    "pilot.xds.push_errors": MetricAggregation.MAX,
+}
+
+
+def get_metric_aggregation(metric_name: str) -> str:
+    """Get the appropriate aggregation for a metric.
+
+    Args:
+        metric_name: Metric name
+
+    Returns:
+        Aggregation type (avg, max, min, p95, p99, sum)
+    """
+    return METRIC_AGGREGATIONS.get(metric_name, MetricAggregation.AVG).value
 
 
 class FieldUpdate(BaseModel):

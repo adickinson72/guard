@@ -1,11 +1,10 @@
 """Check orchestrator for running health checks."""
 
 import asyncio
-from typing import Any
 
 from guard.checks.check_registry import CheckRegistry
 from guard.core.models import CheckResult, ClusterConfig
-from guard.interfaces.check import Check, CheckContext
+from guard.interfaces.check import CheckContext
 from guard.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -92,7 +91,7 @@ class CheckOrchestrator:
                     )
                     break
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.error(
                     "check_timeout",
                     check_name=check.name,

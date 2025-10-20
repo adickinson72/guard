@@ -1,4 +1,4 @@
-"""Secrets management utilities for IGU."""
+"""Secrets management utilities for GUARD."""
 
 import json
 from typing import Any

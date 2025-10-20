@@ -19,6 +19,7 @@ from guard.core.models import (
     DatadogTags,
     UpgradeHistoryEntry,
     ValidationThresholds,
+    get_metric_aggregation,
 )
 
 
@@ -167,16 +168,121 @@ class TestValidationThresholds:
         """Test ValidationThresholds default values."""
         thresholds = ValidationThresholds()
 
-        assert thresholds.latency_increase_percent == 10.0
+        assert thresholds.latency_p95_increase_percent == 10.0
+        assert thresholds.latency_p99_increase_percent == 15.0
         assert thresholds.error_rate_max == 0.001
-        assert thresholds.resource_increase_percent == 50.0
+        assert thresholds.resource_increase_percent == 25.0
 
     def test_validation_thresholds_custom_values(self) -> None:
         """Test ValidationThresholds with custom values."""
         thresholds = ValidationThresholds(
-            latency_increase_percent=5.0, error_rate_max=0.0005, resource_increase_percent=25.0
+            latency_p95_increase_percent=5.0,
+            latency_p99_increase_percent=8.0,
+            error_rate_max=0.0005,
+            resource_increase_percent=20.0,
         )
 
-        assert thresholds.latency_increase_percent == 5.0
+        assert thresholds.latency_p95_increase_percent == 5.0
+        assert thresholds.latency_p99_increase_percent == 8.0
         assert thresholds.error_rate_max == 0.0005
-        assert thresholds.resource_increase_percent == 25.0
+        assert thresholds.resource_increase_percent == 20.0
+
+    def test_get_for_environment_without_overrides(self) -> None:
+        """Test get_for_environment returns base thresholds when no override exists."""
+        thresholds = ValidationThresholds(
+            latency_p95_increase_percent=10.0,
+            error_rate_max=0.001,
+        )
+
+        result = thresholds.get_for_environment("production")
+
+        assert result.latency_p95_increase_percent == 10.0
+        assert result.error_rate_max == 0.001
+        assert result is thresholds  # Should return self when no override
+
+    def test_get_for_environment_with_overrides(self) -> None:
+        """Test get_for_environment applies environment-specific overrides."""
+        prod_override = ValidationThresholds(
+            latency_p95_increase_percent=5.0,
+            error_rate_max=0.0005,
+        )
+
+        thresholds = ValidationThresholds(
+            latency_p95_increase_percent=10.0,
+            latency_p99_increase_percent=15.0,
+            error_rate_max=0.001,
+            resource_increase_percent=25.0,
+            environment_overrides={"production": prod_override},
+        )
+
+        result = thresholds.get_for_environment("production")
+
+        # Overridden values
+        assert result.latency_p95_increase_percent == 5.0
+        assert result.error_rate_max == 0.0005
+
+        # Non-overridden values should remain from base
+        assert result.latency_p99_increase_percent == 15.0
+        assert result.resource_increase_percent == 25.0
+
+    def test_get_for_environment_partial_override(self) -> None:
+        """Test get_for_environment with partial overrides merges correctly."""
+        dev_override = ValidationThresholds(
+            latency_p95_increase_percent=20.0,  # More lenient for dev
+        )
+
+        thresholds = ValidationThresholds(
+            latency_p95_increase_percent=10.0,
+            latency_p99_increase_percent=15.0,
+            error_rate_max=0.001,
+            environment_overrides={"dev": dev_override},
+        )
+
+        result = thresholds.get_for_environment("dev")
+
+        # Override applied
+        assert result.latency_p95_increase_percent == 20.0
+
+        # Base values preserved
+        assert result.latency_p99_increase_percent == 15.0
+        assert result.error_rate_max == 0.001
+
+
+class TestGetMetricAggregation:
+    """Tests for get_metric_aggregation function."""
+
+    def test_get_metric_aggregation_known_metric(self) -> None:
+        """Test get_metric_aggregation returns correct aggregation for known metrics."""
+        assert get_metric_aggregation("istio.request.duration.p95") == "p95"
+        assert get_metric_aggregation("istio.request.duration.p99") == "p99"
+        assert get_metric_aggregation("istio.request.error_rate") == "max"
+        assert get_metric_aggregation("istio.request.count") == "sum"
+        assert get_metric_aggregation("istiod.cpu") == "avg"
+        assert get_metric_aggregation("istiod.memory") == "avg"
+        assert get_metric_aggregation("pilot_total_xds_rejects") == "sum"
+
+    def test_get_metric_aggregation_unknown_metric_defaults_to_avg(self) -> None:
+        """Test get_metric_aggregation returns 'avg' for unknown metrics."""
+        assert get_metric_aggregation("unknown.metric.name") == "avg"
+        assert get_metric_aggregation("custom.metric") == "avg"
+        assert get_metric_aggregation("") == "avg"
+
+    def test_get_metric_aggregation_all_aggregation_types(self) -> None:
+        """Test that all aggregation types are covered."""
+        # P95
+        assert get_metric_aggregation("latency.p95") == "p95"
+
+        # P99
+        assert get_metric_aggregation("latency.p99") == "p99"
+
+        # MAX
+        assert get_metric_aggregation("error_rate") == "max"
+
+        # SUM
+        assert get_metric_aggregation("request.count") == "sum"
+
+        # AVG (explicit)
+        assert get_metric_aggregation("cpu.usage") == "avg"
+
+        # AVG (default)
+        assert get_metric_aggregation("unconfigured.metric") == "avg"

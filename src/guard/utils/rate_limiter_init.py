@@ -14,7 +14,7 @@ def initialize_rate_limiters(config: GuardConfig) -> None:
     all rate limiters with their configured limits.
 
     Args:
-        config: IGU configuration containing rate limit settings
+        config: GUARD configuration containing rate limit settings
     """
     rate_limiter = get_rate_limiter()
     rate_limits = config.rate_limits

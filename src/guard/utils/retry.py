@@ -1,8 +1,9 @@
-"""Retry utilities for IGU."""
+"""Retry utilities for GUARD."""
 
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Any, Callable, Type, TypeVar
+from typing import Any, TypeVar
 
 from tenacity import (
     RetryCallState,
@@ -20,7 +21,7 @@ F = TypeVar("F", bound=Callable[..., Any])
 
 
 def retry_on_exception(
-    exceptions: tuple[Type[Exception], ...] = (Exception,),
+    exceptions: tuple[type[Exception], ...] = (Exception,),
     max_attempts: int = 3,
     min_wait: int = 1,
     max_wait: int = 10,
@@ -63,7 +64,7 @@ def simple_retry(
     max_attempts: int = 3,
     delay: float = 1.0,
     backoff: float = 2.0,
-    exceptions: tuple[Type[Exception], ...] = (Exception,),
+    exceptions: tuple[type[Exception], ...] = (Exception,),
 ) -> F:
     """Simple retry wrapper without using tenacity.
 

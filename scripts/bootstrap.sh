@@ -1,16 +1,16 @@
 #!/bin/bash
 set -e
 
-echo "Bootstrapping IGU..."
+echo "Bootstrapping GUARD..."
 
 # Create config directory
-mkdir -p ~/.igu
+mkdir -p ~/.guard
 
 # Check for example config
-if [ ! -f ~/.igu/config.yaml ]; then
-    echo "Copying example config to ~/.igu/config.yaml"
-    cp examples/config.yaml.example ~/.igu/config.yaml
-    echo "Please edit ~/.igu/config.yaml with your settings"
+if [ ! -f ~/.guard/config.yaml ]; then
+    echo "Copying example config to ~/.guard/config.yaml"
+    cp examples/config.yaml.example ~/.guard/config.yaml
+    echo "Please edit ~/.guard/config.yaml with your settings"
 fi
 
 # Check for istioctl
@@ -27,7 +27,7 @@ fi
 echo ""
 echo "Bootstrap complete!"
 echo "Next steps:"
-echo "  1. Edit ~/.igu/config.yaml"
+echo "  1. Edit ~/.guard/config.yaml"
 echo "  2. Run: ./scripts/setup-dynamodb.sh"
 echo "  3. Setup AWS Secrets Manager secrets"
-echo "  4. Run: igu validate"
+echo "  4. Run: guard validate"

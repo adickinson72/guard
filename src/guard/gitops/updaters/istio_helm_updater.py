@@ -349,7 +349,7 @@ class IstioHelmUpdater(ConfigUpdater):
                     backup_path = Path(str(file_path) + ".bak")
                     shutil.copy(file_path, backup_path)
                     logger.debug("backup_created", backup_path=str(backup_path))
-                except (IOError, OSError, PermissionError) as e:
+                except (OSError, PermissionError) as e:
                     raise ConfigUpdaterError(
                         f"Failed to create backup file at {backup_path}: {e}"
                     ) from e
@@ -404,7 +404,7 @@ class IstioHelmUpdater(ConfigUpdater):
                 error=str(e),
             )
             raise ConfigUpdaterError(f"YAML processing error in {file_path}: {e}") from e
-        except (IOError, OSError) as e:
+        except OSError as e:
             logger.error(
                 "file_io_failed",
                 file_path=str(file_path),

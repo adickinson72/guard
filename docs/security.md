@@ -39,7 +39,7 @@ aws secretsmanager create-secret \
 ```bash
 aws sts assume-role \
     --role-arn arn:aws:iam::123456789:role/GUARD-EKSAccess \
-    --role-session-name igu-session
+    --role-session-name guard-session
 ```
 
 ✅ **Rotate credentials regularly**
@@ -48,9 +48,9 @@ aws sts assume-role \
 - IAM role credentials: Automatically rotated (STS temporary credentials)
 
 ✅ **Use separate credentials for each environment**
-- Dev: `igu-dev/gitlab-token`
-- Staging: `igu-staging/gitlab-token`
-- Prod: `igu-prod/gitlab-token`
+- Dev: `guard-dev/gitlab-token`
+- Staging: `guard-staging/gitlab-token`
+- Prod: `guard-prod/gitlab-token`
 
 ### DON'T:
 
@@ -63,7 +63,7 @@ secrets.yaml
 credentials.json
 ```
 
-❌ **Never store credentials in configuration files**
+❌ **Never store credentials in confguardration files**
 ```yaml
 # BAD - Don't do this!
 gitlab:
@@ -113,7 +113,7 @@ Store secrets with proper structure:
 #### LLM API Key (Optional)
 ```json
 {
-  "name": "igu/llm-api-key",
+  "name": "guard/llm-api-key",
   "description": "OpenAI/Anthropic API key for failure analysis",
   "value": "sk-xxxxxxxxxxxxx"
 }
@@ -153,7 +153,7 @@ Create an IAM role for GUARD with these policies:
         "secretsmanager:GetSecretValue"
       ],
       "Resource": [
-        "arn:aws:secretsmanager:*:*:secret:igu/*"
+        "arn:aws:secretsmanager:*:*:secret:guard/*"
       ]
     },
     {
@@ -213,7 +213,7 @@ Create per-cluster IAM roles for EKS access:
       "Action": "sts:AssumeRole",
       "Condition": {
         "StringEquals": {
-          "sts:ExternalId": "igu-cluster-access"
+          "sts:ExternalId": "guard-cluster-access"
         }
       }
     }
@@ -226,17 +226,17 @@ Create per-cluster IAM roles for EKS access:
 Grant GUARD service account read-only access:
 
 ```yaml
-# igu-rbac.yaml
+# guard-rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: igu
+  name: guard
   namespace: istio-system
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: igu-reader
+  name: guard-reader
 rules:
   # Read pods and deployments
   - apiGroups: [""]
@@ -256,20 +256,20 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: igu-reader-binding
+  name: guard-reader-binding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: igu-reader
+  name: guard-reader
 subjects:
   - kind: ServiceAccount
-    name: igu
+    name: guard
     namespace: istio-system
 ```
 
 Apply to each cluster:
 ```bash
-kubectl apply -f igu-rbac.yaml
+kubectl apply -f guard-rbac.yaml
 ```
 
 Update `aws-auth` ConfigMap:
@@ -280,7 +280,7 @@ kubectl edit configmap aws-auth -n kube-system
 ```yaml
 mapRoles: |
   - rolearn: arn:aws:iam::123456789:role/GUARD-EKSAccess
-    username: igu
+    username: guard
     groups:
       - system:masters  # Or create custom group with limited permissions
 ```
@@ -350,8 +350,8 @@ logging:
   format: json
   output: cloudwatch
   cloudwatch:
-    log_group: /aws/igu/production
-    stream_name: igu-{hostname}-{pid}
+    log_group: /aws/guard/production
+    stream_name: guard-{hostname}-{pid}
 ```
 
 ### CloudTrail
@@ -360,11 +360,11 @@ Enable CloudTrail for AWS API calls:
 
 ```bash
 aws cloudtrail create-trail \
-    --name igu-audit-trail \
-    --s3-bucket-name igu-audit-logs \
+    --name guard-audit-trail \
+    --s3-bucket-name guard-audit-logs \
     --include-global-service-events
 
-aws cloudtrail start-logging --name igu-audit-trail
+aws cloudtrail start-logging --name guard-audit-trail
 ```
 
 Monitor for:
@@ -474,7 +474,7 @@ Use short-lived sessions:
 # Assume role with 1-hour session
 credentials = sts.assume_role(
     RoleArn="arn:aws:iam::123:role/GUARD-EKSAccess",
-    RoleSessionName="igu-session",
+    RoleSessionName="guard-session",
     DurationSeconds=3600  # 1 hour
 )
 ```
@@ -552,7 +552,7 @@ aws cloudtrail lookup-events \
     --start-time "2024-10-18T00:00:00Z"
 
 # Create new role with fresh credentials
-# Update GUARD configuration
+# Update GUARD confguardration
 # Remove deny policy
 ```
 
@@ -564,10 +564,10 @@ aws cloudtrail lookup-events \
     --lookup-attributes AttributeKey=EventName,AttributeValue=AssumeRole
 
 # Check EKS audit logs
-kubectl logs -n kube-system -l component=kube-apiserver | grep igu
+kubectl logs -n kube-system -l component=kube-apiserver | grep guard
 
 # Revoke cluster access
-kubectl delete clusterrolebinding igu-reader-binding
+kubectl delete clusterrolebinding guard-reader-binding
 ```
 
 #### 3. Data Breach
@@ -590,14 +590,14 @@ Set up CloudWatch alarms:
 ```bash
 # Alert on failed authentication
 aws cloudwatch put-metric-alarm \
-    --alarm-name igu-auth-failures \
+    --alarm-name guard-auth-failures \
     --metric-name FailedAuthCount \
     --threshold 5 \
     --comparison-operator GreaterThanThreshold
 
 # Alert on unusual API activity
 aws cloudwatch put-metric-alarm \
-    --alarm-name igu-high-api-calls \
+    --alarm-name guard-high-api-calls \
     --metric-name APICallCount \
     --threshold 1000 \
     --comparison-operator GreaterThanThreshold
@@ -608,16 +608,16 @@ aws cloudwatch put-metric-alarm \
 Before deploying GUARD:
 
 - [ ] All credentials stored in AWS Secrets Manager
-- [ ] IAM roles configured with least privilege
+- [ ] IAM roles confguardred with least privilege
 - [ ] MFA enabled for production access
 - [ ] CloudTrail enabled and logging
 - [ ] EKS audit logging enabled
-- [ ] Kubernetes RBAC configured (read-only)
-- [ ] Network security groups configured
-- [ ] VPC endpoints configured for AWS services
+- [ ] Kubernetes RBAC confguardred (read-only)
+- [ ] Network security groups confguardred
+- [ ] VPC endpoints confguardred for AWS services
 - [ ] Credential rotation policy defined
 - [ ] Incident response playbook documented
-- [ ] Security monitoring and alerts configured
+- [ ] Security monitoring and alerts confguardred
 - [ ] Regular security audits scheduled
 
 ## Reporting Security Issues

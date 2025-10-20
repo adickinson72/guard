@@ -1,4 +1,4 @@
-"""Istio GitOps Upgrader (IGU).
+"""Istio GitOps Upgrader (GUARD).
 
 Automate safe, progressive Istio upgrades across multiple EKS clusters using GitOps workflows.
 """

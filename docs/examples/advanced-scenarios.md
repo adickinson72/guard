@@ -129,13 +129,13 @@ llm:
   enabled: true
   provider: openai  # or anthropic
   model: gpt-4
-  api_key_secret: igu/llm-api-key
+  api_key_secret: guard/llm-api-key
 ```
 
 ```bash
 # Store LLM API key
 aws secretsmanager create-secret \
-    --name igu/llm-api-key \
+    --name guard/llm-api-key \
     --secret-string "sk-xxxxxxxxxxxxx"
 
 # Run upgrade with LLM analysis on failure
@@ -180,7 +180,7 @@ Based on the collected metrics and logs, the likely root cause is:
 
 2. Or upgrade application to handle shorter timeouts
 
-3. Re-validate after configuration change
+3. Re-validate after confguardration change
 ```
 
 ## Custom Health Checks
@@ -366,7 +366,7 @@ execution:
 ```bash
 # GUARD ensures:
 # 1. PodDisruptionBudget exists
-# 2. Rolling update strategy configured
+# 2. Rolling update strategy confguardred
 # 3. Sufficient replicas available
 # 4. Traffic shift gradual
 
@@ -393,7 +393,7 @@ variables:
 upgrade-test:
   stage: upgrade
   script:
-    - pip install igu
+    - pip install guard
     - guard run --batch test --target-version $GUARD_VERSION
     - guard monitor --batch test
   only:
@@ -404,7 +404,7 @@ upgrade-test:
 upgrade-prod:
   stage: upgrade
   script:
-    - pip install igu
+    - pip install guard
     - guard run --batch prod-wave-1 --target-version $GUARD_VERSION
     # Wait for manual MR merge
   when: manual
@@ -416,7 +416,7 @@ upgrade-prod:
 validate-prod:
   stage: validate
   script:
-    - pip install igu
+    - pip install guard
     - guard monitor --batch prod-wave-1 --soak-period 120
   needs: [upgrade-prod]
   environment:
@@ -453,10 +453,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install GUARD
-        run: pip install igu
+        run: pip install guard
 
-      - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Confguardre AWS
+        uses: aws-actions/confguardre-aws-credentials@v2
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
@@ -483,10 +483,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install GUARD
-        run: pip install igu
+        run: pip install guard
 
-      - name: Configure AWS
-        uses: aws-actions/configure-aws-credentials@v2
+      - name: Confguardre AWS
+        uses: aws-actions/confguardre-aws-credentials@v2
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
@@ -517,8 +517,8 @@ aws:
   dynamodb:
     table_name: guard-cluster-registry
   secrets_manager:
-    gitlab_token_secret: igu/team-a/gitlab-token
-    datadog_credentials_secret: igu/team-a/datadog-credentials
+    gitlab_token_secret: guard/team-a/gitlab-token
+    datadog_credentials_secret: guard/team-a/datadog-credentials
 
 batches:
   - name: team-a-prod

@@ -63,6 +63,6 @@ temp/
 *.kubeconfig
 kubeconfig.*
 
-# IGU specific
-.igu/state/
-.igu/cache/
+# GUARD specific
+.guard/state/
+.guard/cache/

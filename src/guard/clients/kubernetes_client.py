@@ -4,7 +4,6 @@ from datetime import datetime
 
 from kubernetes import client, config
 from kubernetes.client.exceptions import ApiException
-from kubernetes.stream import stream
 from kubernetes.client.models import (
     V1DaemonSet,
     V1Deployment,
@@ -15,6 +14,7 @@ from kubernetes.client.models import (
     V1StatefulSet,
     V1ValidatingWebhookConfiguration,
 )
+from kubernetes.stream import stream
 
 from guard.core.exceptions import KubernetesError
 from guard.utils.logging import get_logger
@@ -568,6 +568,67 @@ class KubernetesClient:
             )
             raise KubernetesError(f"Failed to get statefulsets in {namespace}: {e.reason}") from e
 
+    def check_statefulset_ready(self, name: str, namespace: str = "default") -> bool:
+        """Check if statefulset is ready.
+
+        A StatefulSet is considered ready when:
+        - readyReplicas == replicas (all replicas are ready)
+        - currentRevision == updateRevision (rollout complete)
+
+        Args:
+            name: StatefulSet name
+            namespace: Namespace
+
+        Returns:
+            True if statefulset is ready
+        """
+        try:
+            logger.debug("checking_statefulset_ready", name=name, namespace=namespace)
+            response = self.apps_v1.read_namespaced_stateful_set(name=name, namespace=namespace)
+
+            desired = response.spec.replicas or 0
+            ready = response.status.ready_replicas or 0
+            current = response.status.current_replicas or 0
+            updated = response.status.updated_replicas or 0
+
+            # Check if rollout is complete
+            current_revision = response.status.current_revision or ""
+            update_revision = response.status.update_revision or ""
+
+            is_ready = (
+                ready == desired
+                and current == desired
+                and updated == desired
+                and current_revision == update_revision
+                and desired > 0
+            )
+
+            logger.info(
+                "statefulset_ready_check",
+                name=name,
+                namespace=namespace,
+                is_ready=is_ready,
+                ready=ready,
+                current=current,
+                updated=updated,
+                desired=desired,
+                revisions_match=current_revision == update_revision,
+            )
+
+            return is_ready
+
+        except ApiException as e:
+            if e.status == 404:
+                logger.warning("statefulset_not_found", name=name, namespace=namespace)
+                return False
+            logger.error(
+                "statefulset_ready_check_failed",
+                name=name,
+                namespace=namespace,
+                status=e.status,
+            )
+            raise KubernetesError("Failed to check statefulset readiness") from e
+
     def get_daemonsets(self, namespace: str) -> list[V1DaemonSet]:
         """Get all daemonsets in a namespace.
 
@@ -596,6 +657,58 @@ class KubernetesClient:
                 reason=e.reason,
             )
             raise KubernetesError(f"Failed to get daemonsets in {namespace}: {e.reason}") from e
+
+    def check_daemonset_ready(self, name: str, namespace: str = "default") -> bool:
+        """Check if daemonset is ready.
+
+        A DaemonSet is considered ready when:
+        - numberReady == desiredNumberScheduled (all scheduled pods are ready)
+        - updatedNumberScheduled == desiredNumberScheduled (rollout complete)
+
+        Args:
+            name: DaemonSet name
+            namespace: Namespace
+
+        Returns:
+            True if daemonset is ready
+        """
+        try:
+            logger.debug("checking_daemonset_ready", name=name, namespace=namespace)
+            response = self.apps_v1.read_namespaced_daemon_set(name=name, namespace=namespace)
+
+            desired = response.status.desired_number_scheduled or 0
+            ready = response.status.number_ready or 0
+            updated = response.status.updated_number_scheduled or 0
+            available = response.status.number_available or 0
+
+            is_ready = (
+                ready == desired and updated == desired and available == desired and desired > 0
+            )
+
+            logger.info(
+                "daemonset_ready_check",
+                name=name,
+                namespace=namespace,
+                is_ready=is_ready,
+                ready=ready,
+                updated=updated,
+                available=available,
+                desired=desired,
+            )
+
+            return is_ready
+
+        except ApiException as e:
+            if e.status == 404:
+                logger.warning("daemonset_not_found", name=name, namespace=namespace)
+                return False
+            logger.error(
+                "daemonset_ready_check_failed",
+                name=name,
+                namespace=namespace,
+                status=e.status,
+            )
+            raise KubernetesError("Failed to check daemonset readiness") from e
 
     def exec_in_pod(
         self,

@@ -2,8 +2,6 @@
 
 from datetime import datetime
 
-from datadog_api_client.exceptions import ApiException
-
 from guard.clients.datadog_client import DatadogClient
 from guard.interfaces.exceptions import MetricsProviderError
 from guard.interfaces.metrics_provider import MetricPoint, MetricsProvider

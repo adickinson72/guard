@@ -9,11 +9,11 @@ console = Console()
 
 LOGO = """
   ________ ____ ___  _____ __________________
- /  _____/|    |   \/  _  \\______   \______ \\
-/   \  ___|    |   /  /_\  \|       _/|    |  \\
-\    \_\  \    |  /    |    \    |   \|    `   \\
- \______  /______/\____|__  /____|_  /_______  /
-        \/                \/       \/        \/
+ /  _____/|    |   \\/  _  \\______   \\______ \\
+/   \\  ___|    |   /  /_\\  \\|       _/|    |  \\
+\\    \\_\\  \\    |  /    |    \\    |   \\|    `   \\
+ \\______  /______/\\____|__  /____|_  /_______  /
+        \\/                \\/       \\/        \\/
 """
 
 
@@ -49,23 +49,23 @@ def run(
     import asyncio
     from pathlib import Path
 
-    from guard.core.config import GuardConfig
-    from guard.registry.cluster_registry import ClusterRegistry
-    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
     from guard.adapters.aws_adapter import AWSAdapter
-    from guard.adapters.k8s_adapter import KubernetesAdapter
     from guard.adapters.datadog_adapter import DatadogAdapter
+    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
     from guard.adapters.gitlab_adapter import GitLabAdapter
+    from guard.adapters.k8s_adapter import KubernetesAdapter
+    from guard.checks.pre_check_engine import PreCheckOrchestrator
+    from guard.core.config import GuardConfig
     from guard.gitops.gitops_orchestrator import GitOpsOrchestrator
     from guard.gitops.updaters.istio_helm_updater import IstioHelmUpdater
-    from guard.checks.pre_check_engine import PreCheckOrchestrator
-    from guard.services.istio.istio_service import IstioService
     from guard.interfaces.check import CheckContext
+    from guard.registry.cluster_registry import ClusterRegistry
+    from guard.services.istio.istio_service import IstioService
     from guard.utils.logging import get_logger
 
     logger = get_logger(__name__)
 
-    console.print(f"[bold blue]GUARD Run Command[/bold blue]")
+    console.print("[bold blue]GUARD Run Command[/bold blue]")
     console.print(f"Batch: {batch}")
     console.print(f"Target Version: {target_version}")
     console.print(f"Dry Run: {dry_run}")
@@ -113,7 +113,7 @@ def run(
                 all_passed = all(r.passed for r in check_results)
 
                 if not all_passed:
-                    console.print(f"  [red]✗ Pre-checks failed[/red]")
+                    console.print("  [red]✗ Pre-checks failed[/red]")
                     for result in check_results:
                         if not result.passed:
                             console.print(f"    - {result.check_name}: {result.message}")
@@ -255,24 +255,23 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
     """Monitor post-upgrade validation for a batch."""
     import asyncio
     from pathlib import Path
-    from datetime import datetime, timedelta
 
-    from guard.core.config import GuardConfig
-    from guard.registry.cluster_registry import ClusterRegistry
-    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
     from guard.adapters.datadog_adapter import DatadogAdapter
+    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
     from guard.adapters.gitlab_adapter import GitLabAdapter
+    from guard.clients.gitlab_client import GitLabClient
+    from guard.core.config import GuardConfig
+    from guard.core.models import ClusterStatus, ValidationThresholds
+    from guard.registry.cluster_registry import ClusterRegistry
+    from guard.rollback.engine import RollbackEngine
+    from guard.services.istio.istio_service import IstioService
+    from guard.utils.logging import get_logger
     from guard.validation.validation_orchestrator import ValidationOrchestrator
     from guard.validation.validator_registry import ValidatorRegistry
-    from guard.rollback.engine import RollbackEngine
-    from guard.clients.gitlab_client import GitLabClient
-    from guard.services.istio.istio_service import IstioService
-    from guard.core.models import ValidationThresholds, ClusterStatus
-    from guard.utils.logging import get_logger
 
     logger = get_logger(__name__)
 
-    console.print(f"[bold green]GUARD Monitor Command[/bold green]")
+    console.print("[bold green]GUARD Monitor Command[/bold green]")
     console.print(f"Batch: {batch}")
     console.print(f"Soak Period: {soak_period} minutes\n")
 
@@ -434,17 +433,17 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
     import asyncio
     from pathlib import Path
 
-    from guard.core.config import GuardConfig
-    from guard.registry.cluster_registry import ClusterRegistry
     from guard.adapters.dynamodb_adapter import DynamoDBAdapter
-    from guard.rollback.engine import RollbackEngine
     from guard.clients.gitlab_client import GitLabClient
+    from guard.core.config import GuardConfig
     from guard.core.models import ClusterStatus
+    from guard.registry.cluster_registry import ClusterRegistry
+    from guard.rollback.engine import RollbackEngine
     from guard.utils.logging import get_logger
 
     logger = get_logger(__name__)
 
-    console.print(f"[bold red]GUARD Rollback Command[/bold red]")
+    console.print("[bold red]GUARD Rollback Command[/bold red]")
     console.print(f"Batch: {batch}")
     console.print(f"Reason: {reason}\n")
 
@@ -535,13 +534,14 @@ def list_clusters(
     import asyncio
     import json
     from pathlib import Path
+
     from rich.table import Table
 
+    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
     from guard.core.config import GuardConfig
     from guard.registry.cluster_registry import ClusterRegistry
-    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
 
-    console.print(f"[bold cyan]GUARD List Command[/bold cyan]")
+    console.print("[bold cyan]GUARD List Command[/bold cyan]")
     console.print(f"Batch Filter: {batch or 'All'}")
     console.print(f"Environment Filter: {environment or 'All'}\n")
 
@@ -612,71 +612,71 @@ def validate(ctx: click.Context) -> None:
     import asyncio
     from pathlib import Path
 
-    from guard.core.config import GuardConfig
-    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
-    from guard.adapters.datadog_adapter import DatadogAdapter
-    from guard.adapters.gitlab_adapter import GitLabAdapter
     from guard.adapters.aws_adapter import AWSAdapter
+    from guard.adapters.datadog_adapter import DatadogAdapter
+    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
+    from guard.adapters.gitlab_adapter import GitLabAdapter
+    from guard.core.config import GuardConfig
 
-    console.print(f"[bold magenta]GUARD Validate Command[/bold magenta]\n")
+    console.print("[bold magenta]GUARD Validate Command[/bold magenta]\n")
 
     async def _validate():
         try:
             # Load configuration
             config_path = Path(ctx.obj["config"]).expanduser()
-            console.print(f"[bold]1. Configuration File[/bold]")
+            console.print("[bold]1. Configuration File[/bold]")
             console.print(f"  Path: {config_path}")
 
             if not config_path.exists():
-                console.print(f"  [red]✗ Config file not found[/red]")
+                console.print("  [red]✗ Config file not found[/red]")
                 return
 
-            console.print(f"  [green]✓ Config file exists[/green]")
+            console.print("  [green]✓ Config file exists[/green]")
 
             try:
                 app_config = GuardConfig.from_file(str(config_path))
-                console.print(f"  [green]✓ Config file valid[/green]\n")
+                console.print("  [green]✓ Config file valid[/green]\n")
             except Exception as e:
                 console.print(f"  [red]✗ Config file invalid: {e}[/red]\n")
                 return
 
             # Validate DynamoDB connectivity
-            console.print(f"[bold]2. DynamoDB Connectivity[/bold]")
+            console.print("[bold]2. DynamoDB Connectivity[/bold]")
             try:
                 dynamodb = DynamoDBAdapter(region=app_config.aws.region)
                 # Try to list tables or describe table
-                console.print(f"  [green]✓ DynamoDB connection successful[/green]\n")
+                console.print("  [green]✓ DynamoDB connection successful[/green]\n")
             except Exception as e:
                 console.print(f"  [red]✗ DynamoDB connection failed: {e}[/red]\n")
 
             # Validate Datadog connectivity
-            console.print(f"[bold]3. Datadog Connectivity[/bold]")
+            console.print("[bold]3. Datadog Connectivity[/bold]")
             try:
                 datadog = DatadogAdapter(
                     api_key=app_config.datadog.api_key,
                     app_key=app_config.datadog.app_key,
                 )
                 # Try a simple query
-                console.print(f"  [green]✓ Datadog connection successful[/green]\n")
+                console.print("  [green]✓ Datadog connection successful[/green]\n")
             except Exception as e:
                 console.print(f"  [red]✗ Datadog connection failed: {e}[/red]\n")
 
             # Validate GitLab connectivity
-            console.print(f"[bold]4. GitLab Connectivity[/bold]")
+            console.print("[bold]4. GitLab Connectivity[/bold]")
             try:
                 gitlab = GitLabAdapter(
                     url=app_config.gitlab.url,
                     token=app_config.gitlab.token,
                 )
-                console.print(f"  [green]✓ GitLab connection successful[/green]\n")
+                console.print("  [green]✓ GitLab connection successful[/green]\n")
             except Exception as e:
                 console.print(f"  [red]✗ GitLab connection failed: {e}[/red]\n")
 
             # Validate AWS connectivity
-            console.print(f"[bold]5. AWS Connectivity[/bold]")
+            console.print("[bold]5. AWS Connectivity[/bold]")
             try:
                 aws = AWSAdapter(region=app_config.aws.region)
-                console.print(f"  [green]✓ AWS connection successful[/green]\n")
+                console.print("  [green]✓ AWS connection successful[/green]\n")
             except Exception as e:
                 console.print(f"  [red]✗ AWS connection failed: {e}[/red]\n")
 

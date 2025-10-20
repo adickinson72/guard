@@ -103,7 +103,7 @@ class RollbackEngine:
 
 Reason: {failure_reason}
 
-This is an automated rollback created by IGU.
+This is an automated rollback created by GUARD.
 """
 
             if failure_metrics:
@@ -142,7 +142,7 @@ This is an automated rollback created by IGU.
 ### Action Required
 This is an **emergency rollback** MR. Please review and merge as soon as possible.
 
-⚠️ **This rollback was automatically created by IGU due to upgrade validation failures.**
+⚠️ **This rollback was automatically created by GUARD due to upgrade validation failures.**
 """
 
             logger.debug("creating_rollback_mr")

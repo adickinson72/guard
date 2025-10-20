@@ -27,12 +27,19 @@ pytest --cov=guard --cov-report=html
 
 # Run specific test types
 pytest tests/unit/              # Unit tests only
-pytest tests/integration/       # Integration tests
+pytest tests/integration/       # Integration tests (requires credentials)
 pytest tests/e2e/               # End-to-end tests
 
 # Run with markers
 pytest -m "not slow"            # Skip slow tests
-pytest -m "requires_aws"        # AWS integration tests only
+pytest -m integration           # Integration tests only
+pytest -m "not integration"     # Skip integration tests (unit tests only)
+
+# Run specific integration test suites
+pytest tests/integration/test_aws_client_integration.py
+pytest tests/integration/test_gitlab_client_integration.py
+pytest tests/integration/test_kubernetes_client_integration.py
+pytest tests/integration/test_datadog_client_integration.py
 
 # Run a single test file
 pytest tests/unit/test_cluster_registry.py
@@ -40,6 +47,32 @@ pytest tests/unit/test_cluster_registry.py
 # Run a single test function
 pytest tests/unit/test_cluster_registry.py::test_get_clusters_by_batch
 ```
+
+#### Integration Test Requirements
+
+Integration tests require credentials for external services. Tests will skip automatically if credentials are not available.
+
+**Required Environment Variables:**
+```bash
+# AWS Integration Tests
+export AWS_TEST_REGION="us-east-1"
+export AWS_TEST_ROLE_ARN="arn:aws:iam::123:role/TestRole"  # Optional
+
+# GitLab Integration Tests
+export GITLAB_TEST_TOKEN="glpat-xxxxxxxxxxxxx"
+export GITLAB_TEST_PROJECT_ID="group/project"              # Optional
+export GITLAB_TEST_ALLOW_WRITE="true"                      # Optional, enables write tests
+
+# Kubernetes Integration Tests (uses ~/.kube/config by default)
+export KUBECONFIG="/path/to/kubeconfig"                    # Optional
+export K8S_TEST_CONTEXT="my-test-cluster"                  # Optional
+
+# Datadog Integration Tests
+export DATADOG_TEST_API_KEY="xxxxxxxxxxxxx"
+export DATADOG_TEST_APP_KEY="xxxxxxxxxxxxx"
+```
+
+See [tests/integration/README.md](tests/integration/README.md) for detailed integration test documentation.
 
 ### Code Quality
 ```bash
@@ -68,7 +101,7 @@ poetry run guard list --batch test
 poetry run guard run --batch test --target-version 1.20.0
 
 # Run in Kubernetes (after deploying)
-kubectl exec -n guard-system deploy/guard -- igu run --batch prod-wave-1 --target-version 1.20.0
+kubectl exec -n guard-system deploy/guard -- guard run --batch prod-wave-1 --target-version 1.20.0
 ```
 
 ### Kubernetes Deployment

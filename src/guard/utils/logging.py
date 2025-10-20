@@ -1,4 +1,4 @@
-"""Structured logging utilities for IGU."""
+"""Structured logging utilities for GUARD."""
 
 import logging
 import sys
@@ -8,7 +8,7 @@ import structlog
 
 
 def setup_logging(level: str = "INFO", format: str = "json", output: str = "stdout") -> None:
-    """Configure structured logging for IGU.
+    """Configure structured logging for GUARD.
 
     Args:
         level: Log level (DEBUG, INFO, WARNING, ERROR, CRITICAL)

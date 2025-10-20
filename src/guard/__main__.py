@@ -1,4 +1,4 @@
-"""Entry point for IGU CLI."""
+"""Entry point for GUARD CLI."""
 
 from guard.cli.main import cli
 

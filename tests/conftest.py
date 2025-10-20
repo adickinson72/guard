@@ -1,12 +1,21 @@
 """Pytest configuration and shared fixtures."""
 
 from typing import Any
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 from pydantic import BaseModel
 
 from guard.core.models import ClusterConfig, DatadogTags
+
+
+@pytest.fixture(autouse=True)
+def mock_rate_limiters():
+    """Mock rate limiter decorators for all tests."""
+    with patch('guard.utils.rate_limiter.rate_limited') as mock:
+        # Return decorator that just passes through the function
+        mock.return_value = lambda func: func
+        yield mock
 
 
 @pytest.fixture

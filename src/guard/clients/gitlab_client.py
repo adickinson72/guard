@@ -399,3 +399,33 @@ class GitLabClient:
                 error=str(e),
             )
             raise GitOpsError(f"Failed to add comment to MR {mr_iid}: {e}") from e
+
+    @rate_limited("gitlab_api")
+    @retry_on_exception(exceptions=(GitlabError,), max_attempts=3)
+    def get_user_id_by_username(self, username: str) -> int | None:
+        """Look up GitLab user ID by username.
+
+        Args:
+            username: GitLab username (handle without @)
+
+        Returns:
+            User ID if found, None otherwise
+        """
+        try:
+            # Remove @ prefix if present
+            clean_username = username.lstrip("@")
+
+            logger.debug("looking_up_user", username=clean_username)
+
+            users = self.gl.users.list(username=clean_username)
+            if users:
+                user_id = users[0].id
+                logger.info("user_found", username=clean_username, user_id=user_id)
+                return user_id
+
+            logger.warning("user_not_found", username=clean_username)
+            return None
+
+        except GitlabError as e:
+            logger.warning("user_lookup_failed", username=username, error=str(e))
+            return None

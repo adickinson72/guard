@@ -4,9 +4,9 @@ from datetime import datetime
 from typing import Any
 
 from datadog_api_client import ApiClient, Configuration
+from datadog_api_client.exceptions import ApiException
 from datadog_api_client.v1.api.metrics_api import MetricsApi
 from datadog_api_client.v1.api.monitors_api import MonitorsApi
-from datadog_api_client.exceptions import ApiException
 
 from guard.core.exceptions import DatadogError
 from guard.utils.logging import get_logger

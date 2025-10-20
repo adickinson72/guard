@@ -60,7 +60,7 @@ This saves everyone time and ensures alignment.
 # Fork the repository on GitHub first
 # Then clone your fork
 git clone https://github.com/YOUR_USERNAME/guard.git
-cd igu
+cd guard
 
 # Add upstream remote
 git remote add upstream https://github.com/adickinson72/guard.git
@@ -84,7 +84,7 @@ Create a `.env` file for local development:
 
 ```bash
 # .env
-AWS_PROFILE=igu-dev
+AWS_PROFILE=guard-dev
 AWS_REGION=us-east-1
 DATADOG_API_KEY=your-dev-api-key
 DATADOG_APP_KEY=your-dev-app-key
@@ -381,7 +381,7 @@ def create_merge_request(
 
     Raises:
         GitLabError: If MR creation fails
-        ConfigurationError: If GitLab config is invalid
+        ConfguardrationError: If GitLab config is invalid
     """
     pass
 ```
@@ -416,7 +416,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 # Feature
 git commit -m "feat(validation): add custom Datadog query support
 
-Allow users to define custom Datadog queries in configuration
+Allow users to define custom Datadog queries in confguardration
 for validation checks. Queries support template variables for
 cluster name and environment.
 
@@ -438,7 +438,7 @@ Add Poetry installation steps and update pip install command."
 # Breaking change
 git commit -m "feat(config)!: change config file format to YAML
 
-BREAKING CHANGE: Configuration files must now be in YAML format
+BREAKING CHANGE: Confguardration files must now be in YAML format
 instead of JSON. Migration script provided in scripts/migrate-config.py"
 ```
 
@@ -560,7 +560,7 @@ open _build/html/index.html
 
 - **Questions**: Open a [GitHub Discussion](https://github.com/adickinson72/guard/discussions)
 - **Bugs**: Open a [GitHub Issue](https://github.com/adickinson72/guard/issues)
-- **Chat**: Join #igu-dev on Slack
+- **Chat**: Join #guard-dev on Slack
 
 ## Recognition
 

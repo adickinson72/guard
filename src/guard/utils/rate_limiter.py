@@ -2,8 +2,9 @@
 
 import threading
 import time
+from collections.abc import Callable
 from functools import wraps
-from typing import Callable, TypeVar
+from typing import TypeVar
 
 from guard.utils.logging import get_logger
 

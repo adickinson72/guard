@@ -4,12 +4,12 @@
 # You can use either YAML or JSON format.
 #
 # Usage:
-#   igu run --batch prod-wave-1 --upgrade-spec upgrade-spec.yaml
+#   guard run --batch prod-wave-1 --upgrade-spec upgrade-spec.yaml
 #
 # IMPORTANT - Fail-Fast Behavior:
 # - All paths MUST exist in the target HelmRelease file
 # - If a path doesn't exist, the upgrade will FAIL immediately
-# - This prevents accidental configuration corruption from typos
+# - This prevents accidental confguardration corruption from typos
 # - Example: "spec.chart.speck.version" (typo) will FAIL instead of
 #   silently creating a wrong field
 # - To create new fields, ensure the parent path exists first
@@ -28,7 +28,7 @@ updates:
   - path: "spec.values.global.tag"
     value: "1.20.0"
 
-  # Update pilot configuration
+  # Update pilot confguardration
   - path: "spec.values.pilot.autoscaleEnabled"
     value: true
 

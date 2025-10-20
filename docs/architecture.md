@@ -69,10 +69,10 @@ GUARD is a Python-based automation tool that orchestrates safe, progressive Isti
 └──────┬──────────────────────────────────────────────────────┘
        │
 ┌──────▼──────────────────────────────────────────────────────┐
-│  Core Configuration (src/guard/core/config.py)                │
+│  Core Confguardration (src/guard/core/config.py)                │
 │  • Load YAML config                                          │
 │  • Validate settings                                         │
-│  • Provide typed access to configuration                    │
+│  • Provide typed access to confguardration                    │
 └──────┬──────────────────────────────────────────────────────┘
        │
 ┌──────▼──────────────────────────────────────────────────────┐
@@ -132,7 +132,7 @@ GUARD is a Python-based automation tool that orchestrates safe, progressive Isti
 Handles user interaction and command routing.
 
 **Commands**:
-- `guard validate` - Validate configuration
+- `guard validate` - Validate confguardration
 - `guard list` - List clusters
 - `guard run` - Execute upgrade workflow
 - `guard monitor` - Monitor upgrade progress
@@ -205,7 +205,7 @@ Runs comprehensive health checks before upgrades.
 2. **Istio Health**
    - `istioctl analyze` validation
    - Pilot/proxy versions
-   - Configuration errors
+   - Confguardration errors
 
 3. **Datadog Metrics**
    - Baseline latency (p95, p99)
@@ -257,7 +257,7 @@ Post-upgrade validation and monitoring.
 **Process**:
 1. Wait for Flux sync (poll GitOps status)
 2. Monitor pod rollout (`kubectl rollout status`)
-3. Soak period (configurable wait)
+3. Soak period (confguardrable wait)
 4. Query post-upgrade metrics
 5. Compare with baseline
 6. Validate against thresholds
@@ -310,7 +310,7 @@ mr_merged → upgrading → validating → upgraded
 **Goal**: Initialize environment
 
 **Steps**:
-1. Load configuration
+1. Load confguardration
 2. Validate AWS credentials
 3. Retrieve secrets from Secrets Manager
 4. Initialize clients (AWS, Kubernetes, Datadog, GitLab)
@@ -400,7 +400,7 @@ mr_merged → upgrading → validating → upgraded
 
 ## Data Flow
 
-### Configuration Flow
+### Confguardration Flow
 
 ```
 config.yaml → GuardConfig → Components
@@ -516,7 +516,7 @@ class CustomHealthCheck(HealthCheck):
         pass
 ```
 
-Register in configuration:
+Register in confguardration:
 
 ```yaml
 custom_checks:

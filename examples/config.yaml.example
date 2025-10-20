@@ -1,4 +1,4 @@
-# IGU Configuration File Example
+# GUARD Confguardration File Example
 
 # AWS Settings
 aws:
@@ -42,9 +42,9 @@ llm:
   enabled: false
   provider: openai
   model: gpt-4
-  api_key_secret: igu/llm-api-key
+  api_key_secret: guard/llm-api-key
 
-# Batch Configuration
+# Batch Confguardration
 batches:
   - name: test
     description: Test cluster

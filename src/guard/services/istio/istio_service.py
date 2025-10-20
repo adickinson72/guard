@@ -5,10 +5,10 @@ from guard.gitops.updaters.istio_helm_updater import IstioHelmUpdater
 from guard.interfaces.config_updater import ConfigUpdater
 from guard.services.istio.checks.istioctl_analyze import IstioCtlAnalyzeCheck
 from guard.services.istio.checks.sidecar_version import IstioSidecarVersionCheck
-from guard.services.istio.validators.latency import IstioLatencyValidator
 from guard.services.istio.validators.error_rate import IstioErrorRateValidator
-from guard.validation.validator_registry import ValidatorRegistry
+from guard.services.istio.validators.latency import IstioLatencyValidator
 from guard.utils.logging import get_logger
+from guard.validation.validator_registry import ValidatorRegistry
 
 logger = get_logger(__name__)
 

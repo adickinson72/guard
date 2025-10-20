@@ -2,7 +2,6 @@
 
 from typing import Any
 
-import boto3
 from botocore.exceptions import ClientError
 
 from guard.clients.aws_client import AWSClient

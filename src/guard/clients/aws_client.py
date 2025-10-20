@@ -46,7 +46,7 @@ class AWSClient:
 
         Args:
             role_arn: IAM role ARN to assume
-            session_name: Session name (defaults to 'IGU-Session')
+            session_name: Session name (defaults to 'GUARD-Session')
 
         Returns:
             New boto3 session with assumed role credentials
@@ -141,9 +141,10 @@ class AWSClient:
 
             # Generate a presigned URL for STS GetCallerIdentity
             # This is what `aws eks get-token` does under the hood
-            from botocore.signers import RequestSigner
-            from botocore.model import ServiceId
             import datetime
+
+            from botocore.model import ServiceId
+            from botocore.signers import RequestSigner
 
             # Get cluster info for endpoint and CA
             cluster_info = self.get_eks_cluster_info(cluster_name)

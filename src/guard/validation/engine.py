@@ -34,7 +34,7 @@ class ValidationEngine:
     ) -> bool:
         """Wait for Flux to sync changes.
 
-        Monitors Flux Kustomizations and HelmReleases for reconciliation.
+        Monitors both Flux Kustomizations and HelmReleases for reconciliation.
         Uses flux CLI commands to check sync status.
 
         Args:
@@ -57,8 +57,11 @@ class ValidationEngine:
 
         while (time.time() - start_time) < timeout:
             try:
-                # Check if flux kustomizations are ready
-                result = subprocess.run(
+                kustomizations_ready = False
+                helmreleases_ready = False
+
+                # 1. Check if flux kustomizations are ready
+                kustomizations_result = subprocess.run(
                     ["flux", "get", "kustomizations", "-A", "--no-header"],
                     capture_output=True,
                     text=True,
@@ -66,20 +69,60 @@ class ValidationEngine:
                     check=False,
                 )
 
-                if result.returncode == 0:
+                if kustomizations_result.returncode == 0:
                     # Parse output to check if all are ready
+                    # Expected format: NAMESPACE  NAME  REVISION  SUSPENDED  READY  MESSAGE
                     lines = [
-                        line.strip() for line in result.stdout.strip().split("\n") if line.strip()
+                        line.strip()
+                        for line in kustomizations_result.stdout.strip().split("\n")
+                        if line.strip()
                     ]
                     if lines:
-                        all_ready = all("True" in line for line in lines)
-                        if all_ready:
-                            logger.info(
-                                "flux_sync_completed",
-                                cluster_id=cluster.cluster_id,
-                                duration=int(time.time() - start_time),
-                            )
-                            return True
+                        # Check READY column (look for "True" or "Ready")
+                        kustomizations_ready = all(
+                            "True" in line or "\tTrue\t" in line for line in lines
+                        )
+                    else:
+                        # No kustomizations found, consider ready
+                        kustomizations_ready = True
+
+                # 2. Check if flux helmreleases are ready
+                helmreleases_result = subprocess.run(
+                    ["flux", "get", "helmreleases", "-A", "--no-header"],
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+
+                if helmreleases_result.returncode == 0:
+                    # Parse output to check if all are ready
+                    # Expected format: NAMESPACE  NAME  REVISION  SUSPENDED  READY  MESSAGE
+                    lines = [
+                        line.strip()
+                        for line in helmreleases_result.stdout.strip().split("\n")
+                        if line.strip()
+                    ]
+                    if lines:
+                        # Check READY column and also verify no "False" status
+                        helmreleases_ready = all(
+                            "True" in line and "False" not in line.split("\t")[4:5]
+                            for line in lines
+                        )
+                    else:
+                        # No helmreleases found, consider ready
+                        helmreleases_ready = True
+
+                # Both must be ready for sync to be complete
+                if kustomizations_ready and helmreleases_ready:
+                    logger.info(
+                        "flux_sync_completed",
+                        cluster_id=cluster.cluster_id,
+                        duration=int(time.time() - start_time),
+                        kustomizations_ready=kustomizations_ready,
+                        helmreleases_ready=helmreleases_ready,
+                    )
+                    return True
 
                 # Log progress every 30 seconds
                 if (time.time() - last_log_time) >= 30:
@@ -88,6 +131,8 @@ class ValidationEngine:
                         cluster_id=cluster.cluster_id,
                         elapsed=int(time.time() - start_time),
                         timeout=timeout,
+                        kustomizations_ready=kustomizations_ready,
+                        helmreleases_ready=helmreleases_ready,
                     )
                     last_log_time = time.time()
 
@@ -144,21 +189,175 @@ class ValidationEngine:
 
         logger.info("soak_period_completed", total_duration_seconds=elapsed)
 
-    def validate_istio_deployment(self, cluster: ClusterConfig) -> CheckResult:
+    def validate_istio_deployment(
+        self, cluster: ClusterConfig, k8s_client: KubernetesClient
+    ) -> CheckResult:
         """Validate Istio deployment after upgrade.
+
+        Performs comprehensive Istio health checks including:
+        - istiod pods ready and running
+        - Gateway pods ready and running
+        - istioctl analyze for configuration errors
+        - istioctl proxy-status for data plane connectivity
 
         Args:
             cluster: Cluster configuration
+            k8s_client: Kubernetes client instance
 
         Returns:
-            CheckResult
+            CheckResult indicating pass/fail with detailed messages
         """
         logger.info("validating_istio_deployment", cluster_id=cluster.cluster_id)
-        # TODO: Implement Istio deployment validation
+        issues = []
+
+        try:
+            # 1. Check istiod pods (control plane)
+            try:
+                istiod_pods = k8s_client.get_pods(
+                    namespace="istio-system", label_selector="app=istiod"
+                )
+                if not istiod_pods:
+                    issues.append("No istiod pods found in istio-system namespace")
+                else:
+                    not_ready = []
+                    for pod in istiod_pods:
+                        # Check pod readiness via conditions
+                        is_ready = False
+                        if pod.status.conditions:
+                            for condition in pod.status.conditions:
+                                if condition.type == "Ready":
+                                    is_ready = condition.status == "True"
+                                    break
+
+                        if not is_ready:
+                            not_ready.append(pod.metadata.name)
+
+                    if not_ready:
+                        issues.append(f"istiod pods not ready: {', '.join(not_ready)}")
+                    else:
+                        logger.info("istiod_pods_ready", count=len(istiod_pods))
+            except Exception as e:
+                issues.append(f"Failed to check istiod pods: {e!s}")
+
+            # 2. Check gateway pods
+            try:
+                gateway_pods = k8s_client.get_pods(
+                    namespace="istio-system", label_selector="istio=ingressgateway"
+                )
+                # Also check for alternative gateway labels
+                if not gateway_pods:
+                    gateway_pods = k8s_client.get_pods(
+                        namespace="istio-system", label_selector="app=istio-ingressgateway"
+                    )
+
+                if gateway_pods:
+                    not_ready = []
+                    for pod in gateway_pods:
+                        is_ready = False
+                        if pod.status.conditions:
+                            for condition in pod.status.conditions:
+                                if condition.type == "Ready":
+                                    is_ready = condition.status == "True"
+                                    break
+
+                        if not is_ready:
+                            not_ready.append(pod.metadata.name)
+
+                    if not_ready:
+                        issues.append(f"Gateway pods not ready: {', '.join(not_ready)}")
+                    else:
+                        logger.info("gateway_pods_ready", count=len(gateway_pods))
+            except Exception as e:
+                logger.warning("gateway_check_failed", error=str(e))
+                # Gateways are optional, don't fail validation
+
+            # 3. Run istioctl analyze for configuration issues
+            try:
+                analyze_result = subprocess.run(
+                    ["istioctl", "analyze", "--namespace", "istio-system"],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    check=False,
+                )
+
+                if analyze_result.returncode != 0 and analyze_result.stdout:
+                    # Parse output for errors (not warnings)
+                    output_lines = analyze_result.stdout.strip().split("\n")
+                    errors = [line for line in output_lines if "[Error]" in line or "Error" in line]
+                    if errors:
+                        issues.append(f"istioctl analyze found errors: {'; '.join(errors[:3])}")
+                    else:
+                        logger.info("istioctl_analyze_warnings_only")
+                elif analyze_result.returncode == 0:
+                    logger.info("istioctl_analyze_passed")
+            except subprocess.TimeoutExpired:
+                issues.append("istioctl analyze timed out after 60s")
+            except FileNotFoundError:
+                logger.warning(
+                    "istioctl_not_found", message="istioctl not in PATH, skipping analyze"
+                )
+            except Exception as e:
+                logger.warning("istioctl_analyze_failed", error=str(e))
+
+            # 4. Check proxy status (data plane connectivity)
+            try:
+                proxy_status_result = subprocess.run(
+                    ["istioctl", "proxy-status"],
+                    capture_output=True,
+                    text=True,
+                    timeout=60,
+                    check=False,
+                )
+
+                if proxy_status_result.returncode == 0 and proxy_status_result.stdout:
+                    # Parse output to check for NOT SYNCED proxies
+                    output_lines = proxy_status_result.stdout.strip().split("\n")
+                    if len(output_lines) > 1:  # Has header + data
+                        not_synced = []
+                        for line in output_lines[1:]:  # Skip header
+                            if line and "SYNCED" not in line and line.strip():
+                                parts = line.split()
+                                if parts:
+                                    not_synced.append(parts[0])
+
+                        if not_synced:
+                            issues.append(
+                                f"Proxies not synced: {len(not_synced)} proxies "
+                                f"(examples: {', '.join(not_synced[:3])})"
+                            )
+                        else:
+                            logger.info("all_proxies_synced")
+            except subprocess.TimeoutExpired:
+                issues.append("istioctl proxy-status timed out after 60s")
+            except FileNotFoundError:
+                logger.warning("istioctl_not_found_proxy_status")
+            except Exception as e:
+                logger.warning("istioctl_proxy_status_failed", error=str(e))
+
+        except Exception as e:
+            issues.append(f"Istio validation failed: {e!s}")
+            logger.error("istio_validation_exception", error=str(e))
+
+        passed = len(issues) == 0
+        message = (
+            "Istio deployment validated successfully"
+            if passed
+            else f"Istio deployment validation failed: {'; '.join(issues)}"
+        )
+
+        logger.info(
+            "istio_deployment_validation_completed",
+            cluster_id=cluster.cluster_id,
+            passed=passed,
+            issue_count=len(issues),
+        )
+
         return CheckResult(
             check_name="istio_deployment",
-            passed=True,
-            message="Istio deployment validated",
+            passed=passed,
+            message=message,
+            metrics={"issues": issues},
             timestamp=datetime.utcnow(),
         )
 
@@ -341,8 +540,9 @@ class ValidationEngine:
                             error=str(e),
                         )
 
-                # Wait for workloads in this wave to be ready before next wave
-                if wait_for_ready and wave_restarted and wave_number < total_waves:
+                # Wait for workloads in this wave to be ready
+                # Fix: Always wait, including final wave (removed wave_number < total_waves condition)
+                if wait_for_ready and wave_restarted:
                     logger.info(
                         "waiting_for_wave_readiness",
                         wave=wave_number,
@@ -357,12 +557,18 @@ class ValidationEngine:
 
                         for kind, ns, name in wave_restarted:
                             try:
+                                # Fix: Implement proper readiness checks for all workload types
                                 if kind == "Deployment":
                                     if k8s_client.check_deployment_ready(name=name, namespace=ns):
                                         ready_count += 1
-                                # Note: StatefulSets and DaemonSets need similar ready checks
-                                # For now, we assume they're ready if no error
+                                elif kind == "StatefulSet":
+                                    if k8s_client.check_statefulset_ready(name=name, namespace=ns):
+                                        ready_count += 1
+                                elif kind == "DaemonSet":
+                                    if k8s_client.check_daemonset_ready(name=name, namespace=ns):
+                                        ready_count += 1
                                 else:
+                                    # Unknown workload type, assume ready
                                     ready_count += 1
                             except Exception as e:
                                 logger.debug(
@@ -422,6 +628,6 @@ class ValidationEngine:
             return CheckResult(
                 check_name="restart_pods_with_sidecars",
                 passed=False,
-                message=f"Failed to restart pods with sidecars: {str(e)}",
+                message=f"Failed to restart pods with sidecars: {e!s}",
                 timestamp=datetime.utcnow(),
             )

@@ -55,10 +55,10 @@ class IstioLatencyValidator(Validator):
         if baseline_p95 > 0:
             increase_percent = ((current_p95 - baseline_p95) / baseline_p95) * 100
 
-            if increase_percent > thresholds.latency_increase_percent:
+            if increase_percent > thresholds.latency_p95_increase_percent:
                 violations.append(
                     f"P95 latency increased {increase_percent:.1f}% "
-                    f"(threshold: {thresholds.latency_increase_percent}%): "
+                    f"(threshold: {thresholds.latency_p95_increase_percent}%): "
                     f"{baseline_p95:.2f}ms -> {current_p95:.2f}ms"
                 )
 
@@ -69,10 +69,10 @@ class IstioLatencyValidator(Validator):
         if baseline_p99 > 0:
             increase_percent = ((current_p99 - baseline_p99) / baseline_p99) * 100
 
-            if increase_percent > thresholds.latency_increase_percent:
+            if increase_percent > thresholds.latency_p99_increase_percent:
                 violations.append(
                     f"P99 latency increased {increase_percent:.1f}% "
-                    f"(threshold: {thresholds.latency_increase_percent}%): "
+                    f"(threshold: {thresholds.latency_p99_increase_percent}%): "
                     f"{baseline_p99:.2f}ms -> {current_p99:.2f}ms"
                 )
 

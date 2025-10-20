@@ -1,5 +1,7 @@
 """Istio sidecar version check."""
 
+import re
+
 from guard.core.models import CheckResult, ClusterConfig
 from guard.interfaces.check import Check, CheckContext
 from guard.utils.logging import get_logger
@@ -23,6 +25,26 @@ class IstioSidecarVersionCheck(Check):
     def description(self) -> str:
         """Get check description."""
         return "Validates Istio sidecar proxy versions match control plane"
+
+    def _extract_version_from_image(self, image: str) -> str | None:
+        """Extract version from container image tag.
+
+        Args:
+            image: Container image (e.g., "istio/proxyv2:1.20.0")
+
+        Returns:
+            Version string or None if not found
+        """
+        # Match patterns like:
+        # - istio/proxyv2:1.20.0
+        # - docker.io/istio/proxyv2:1.20.0-distroless
+        # - gcr.io/istio-release/proxyv2:1.20.0
+        match = re.search(r":(\d+\.\d+\.\d+)", image)
+        if match:
+            return match.group(1)
+
+        logger.debug("version_extraction_failed", image=image)
+        return None
 
     async def execute(
         self,
@@ -48,20 +70,44 @@ class IstioSidecarVersionCheck(Check):
 
             version_mismatches = []
             total_pods_checked = 0
+            expected_version = cluster.current_istio_version
 
             for namespace in namespaces:
                 pods = await k8s.get_pods(namespace=namespace)
 
                 for pod in pods:
-                    # Check if pod has istio-proxy container
-                    has_sidecar = any(
-                        cs.get("name") == "istio-proxy" for cs in pod.container_statuses
-                    )
+                    # Find istio-proxy container in pod spec
+                    proxy_container = None
+                    if hasattr(pod, "spec") and hasattr(pod.spec, "containers"):
+                        for container in pod.spec.containers:
+                            if hasattr(container, "name") and container.name == "istio-proxy":
+                                proxy_container = container
+                                break
 
-                    if has_sidecar:
+                    if proxy_container:
                         total_pods_checked += 1
-                        # In real implementation, would check actual version
-                        # For now, assume versions match
+
+                        # Extract version from container image
+                        actual_version = self._extract_version_from_image(
+                            proxy_container.image
+                        )
+
+                        # Compare versions
+                        if actual_version and actual_version != expected_version:
+                            version_mismatches.append(
+                                {
+                                    "pod": f"{namespace}/{pod.metadata.name}",
+                                    "expected": expected_version,
+                                    "actual": actual_version,
+                                    "image": proxy_container.image,
+                                }
+                            )
+                            logger.warning(
+                                "sidecar_version_mismatch",
+                                pod=f"{namespace}/{pod.metadata.name}",
+                                expected=expected_version,
+                                actual=actual_version,
+                            )
 
             if version_mismatches:
                 return CheckResult(

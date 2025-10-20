@@ -1,6 +1,5 @@
 """Kubernetes adapter implementing KubernetesProvider interface."""
 
-from kubernetes.client.exceptions import ApiException
 
 from guard.clients.kubernetes_client import KubernetesClient
 from guard.interfaces.exceptions import KubernetesProviderError

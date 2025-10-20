@@ -161,11 +161,16 @@ class GitOpsOrchestrator:
         mr_description = self._generate_mr_description(cluster, target_version)
 
         # Parse assignee from owner_handle if available
-        assignee_ids = None
+        assignee_id = None
         if cluster.owner_handle:
-            # Would need to look up user ID from handle
-            # For now, skip assignee
-            pass
+            # Remove @ prefix if present
+            username = cluster.owner_handle.lstrip("@")
+            user_id = await self.git.get_user_id_by_username(username)
+            if user_id:
+                assignee_id = user_id
+                logger.info("mr_assignee_set", username=username, user_id=user_id)
+            else:
+                logger.warning("user_not_found", username=username)
 
         mr = await self.git.create_merge_request(
             project_id=cluster.gitlab_repo,
@@ -174,7 +179,7 @@ class GitOpsOrchestrator:
             title=mr_title,
             description=mr_description,
             draft=draft,
-            assignee_ids=assignee_ids,
+            assignee_id=assignee_id,
         )
 
         logger.info(
@@ -370,7 +375,7 @@ class GitOpsOrchestrator:
             )
 
             # Build lists of successful and failed group identifiers
-            successful_keys = [f"{repo}:{path}" for (repo, path) in mr_infos.keys()]
+            successful_keys = [f"{repo}:{path}" for (repo, path) in mr_infos]
             failed_keys = [f"{repo}:{path}" for (repo, path) in failed_groups]
 
             raise PartialFailureError(

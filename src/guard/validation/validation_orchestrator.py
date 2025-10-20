@@ -3,11 +3,11 @@
 import asyncio
 from datetime import datetime, timedelta
 
-from guard.core.models import ClusterConfig, ValidationThresholds
+from guard.core.models import ClusterConfig, ValidationThresholds, get_metric_aggregation
 from guard.interfaces.metrics_provider import MetricsProvider
 from guard.interfaces.validator import MetricsSnapshot, ValidationResult
-from guard.validation.validator_registry import ValidatorRegistry
 from guard.utils.logging import get_logger
+from guard.validation.validator_registry import ValidatorRegistry
 
 logger = get_logger(__name__)
 
@@ -82,12 +82,14 @@ class ValidationOrchestrator:
 
         for metric_name in required_metrics:
             try:
+                # Use per-metric aggregation instead of hardcoded "avg"
+                aggregation = get_metric_aggregation(metric_name)
                 value = await self.metrics.query_scalar(
                     metric_name=metric_name,
                     start_time=start_time,
                     end_time=end_time,
                     tags=tags,
-                    aggregation="avg",
+                    aggregation=aggregation,
                 )
                 metrics_data[metric_name] = value
             except Exception as e:
@@ -158,12 +160,14 @@ class ValidationOrchestrator:
 
         for metric_name in baseline.metrics.keys():
             try:
+                # Use per-metric aggregation instead of hardcoded "avg"
+                aggregation = get_metric_aggregation(metric_name)
                 value = await self.metrics.query_scalar(
                     metric_name=metric_name,
                     start_time=start_time,
                     end_time=end_time,
                     tags=tags,
-                    aggregation="avg",
+                    aggregation=aggregation,
                 )
                 metrics_data[metric_name] = value
             except Exception as e:
@@ -249,7 +253,7 @@ class ValidationOrchestrator:
                     )
                     break
 
-            except asyncio.TimeoutError:
+            except TimeoutError:
                 logger.error(
                     "validator_timeout",
                     validator_name=validator.name,

@@ -5,7 +5,7 @@
   "region": "us-east-1",
   "gitlab_repo": "infra/k8s-clusters",
   "flux_config_path": "clusters/prod/us-east-1/app1/istio-helmrelease.yaml",
-  "aws_role_arn": "arn:aws:iam::123456789:role/IGU-EKSAccess",
+  "aws_role_arn": "arn:aws:iam::123456789:role/GUARD-EKSAccess",
   "current_istio_version": "1.19.3",
   "datadog_tags": {
     "cluster": "eks-prod-us-east-1-app1",

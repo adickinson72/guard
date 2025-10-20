@@ -6,7 +6,7 @@ This document provides a reference for GUARD's Python API. While GUARD is primar
 
 - [Installation](#installation)
 - [Core Modules](#core-modules)
-- [Configuration](#configuration)
+- [Confguardration](#confguardration)
 - [Cluster Registry](#cluster-registry)
 - [Pre-Check Engine](#pre-check-engine)
 - [Validation Engine](#validation-engine)
@@ -19,14 +19,14 @@ This document provides a reference for GUARD's Python API. While GUARD is primar
 ## Installation
 
 ```bash
-pip install igu
+pip install guard
 ```
 
 ## Core Modules
 
-### Configuration
+### Confguardration
 
-Load and manage GUARD configuration.
+Load and manage GUARD confguardration.
 
 ```python
 from guard.core.config import GuardConfig
@@ -34,12 +34,12 @@ from guard.core.config import GuardConfig
 # Load from file
 config = GuardConfig.from_file("~/.guard/config.yaml")
 
-# Access configuration
+# Access confguardration
 print(config.aws.region)
 print(config.gitlab.url)
 print(config.validation.soak_period_minutes)
 
-# Get batch configuration
+# Get batch confguardration
 batch = config.get_batch("prod-wave-1")
 print(batch.clusters)
 ```
@@ -47,19 +47,19 @@ print(batch.clusters)
 **Class**: `GuardConfig`
 
 **Methods**:
-- `from_file(path: str | Path) -> GuardConfig` - Load configuration from YAML file
-- `get_batch(batch_name: str) -> BatchConfig | None` - Get batch configuration by name
+- `from_file(path: str | Path) -> GuardConfig` - Load confguardration from YAML file
+- `get_batch(batch_name: str) -> BatchConfig | None` - Get batch confguardration by name
 - `to_dict() -> dict[str, Any]` - Convert to dictionary
 
 **Attributes**:
-- `aws: AWSConfig` - AWS configuration
-- `gitlab: GitLabConfig` - GitLab configuration
-- `datadog: DatadogConfig` - Datadog configuration
+- `aws: AWSConfig` - AWS confguardration
+- `gitlab: GitLabConfig` - GitLab confguardration
+- `datadog: DatadogConfig` - Datadog confguardration
 - `validation: ValidationConfig` - Validation settings
 - `rollback: RollbackConfig` - Rollback settings
 - `llm: LLMConfig` - LLM settings
 - `batches: list[BatchConfig]` - Batch definitions
-- `logging: LoggingConfig` - Logging configuration
+- `logging: LoggingConfig` - Logging confguardration
 
 ## Cluster Registry
 
@@ -245,7 +245,7 @@ client = AWSClient(region="us-east-1")
 # Assume role for cluster access
 credentials = await client.assume_role(
     role_arn="arn:aws:iam::123:role/GUARD-EKSAccess",
-    session_name="igu-session"
+    session_name="guard-session"
 )
 
 # Get secret
@@ -320,7 +320,7 @@ client = GitLabClient(
 # Create MR
 mr = await client.create_merge_request(
     project_id="infra/k8s-clusters",
-    source_branch="igu/upgrade-1.20.0",
+    source_branch="guard/upgrade-1.20.0",
     target_branch="main",
     title="Upgrade Istio to 1.20.0",
     description="Automated upgrade via GUARD"
@@ -419,7 +419,7 @@ result = ValidationResult(
 
 ```python
 from guard.core.exceptions import (
-    ConfigurationError,
+    ConfguardrationError,
     RegistryError,
     HealthCheckError,
     ValidationError,
@@ -429,8 +429,8 @@ from guard.core.exceptions import (
 
 try:
     config = GuardConfig.from_file("config.yaml")
-except ConfigurationError as e:
-    print(f"Configuration error: {e}")
+except ConfguardrationError as e:
+    print(f"Confguardration error: {e}")
 
 try:
     cluster = registry.get_cluster("invalid-id")
@@ -440,7 +440,7 @@ except RegistryError as e:
 
 **Exception Hierarchy**:
 - `GuardError` (base exception)
-  - `ConfigurationError` - Configuration issues
+  - `ConfguardrationError` - Confguardration issues
   - `RegistryError` - Cluster registry errors
   - `HealthCheckError` - Pre-check failures
   - `ValidationError` - Post-upgrade validation failures
@@ -459,7 +459,7 @@ from guard.gitops.manager import GitOpsManager
 from guard.validation.engine import ValidationEngine
 
 async def main():
-    # Load configuration
+    # Load confguardration
     config = GuardConfig.from_file("~/.guard/config.yaml")
 
     # Initialize components
@@ -535,7 +535,7 @@ mypy your_script.py
 
 ## Logging
 
-Configure logging in your application:
+Confguardre logging in your application:
 
 ```python
 import logging
@@ -546,5 +546,5 @@ logging.basicConfig(
 )
 
 # GUARD loggers
-logging.getLogger('igu').setLevel(logging.DEBUG)
+logging.getLogger('guard').setLevel(logging.DEBUG)
 ```

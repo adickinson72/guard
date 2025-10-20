@@ -5,7 +5,7 @@ Common issues and solutions when using GUARD.
 ## Table of Contents
 
 - [Installation Issues](#installation-issues)
-- [Configuration Issues](#configuration-issues)
+- [Confguardration Issues](#confguardration-issues)
 - [AWS/DynamoDB Issues](#awsdynamodb-issues)
 - [GitLab Issues](#gitlab-issues)
 - [Datadog Issues](#datadog-issues)
@@ -17,12 +17,12 @@ Common issues and solutions when using GUARD.
 
 ## Installation Issues
 
-### Issue: `pip install igu` fails
+### Issue: `pip install guard` fails
 
 **Symptoms:**
 ```bash
-$ pip install igu
-ERROR: Could not find a version that satisfies the requirement igu
+$ pip install guard
+ERROR: Could not find a version that satisfies the requirement guard
 ```
 
 **Solutions:**
@@ -42,13 +42,13 @@ sudo apt install python3.11
 2. **Upgrade pip:**
 ```bash
 pip install --upgrade pip
-pip install igu
+pip install guard
 ```
 
 3. **Install from source:**
 ```bash
 git clone https://github.com/adickinson72/guard.git
-cd igu
+cd guard
 pip install -e .
 ```
 
@@ -57,16 +57,16 @@ pip install -e .
 **Symptoms:**
 ```bash
 $ guard --version
-ModuleNotFoundError: No module named 'igu'
+ModuleNotFoundError: No module named 'guard'
 ```
 
 **Solutions:**
 
 1. **Check installation:**
 ```bash
-pip list | grep igu
+pip list | grep guard
 # If not listed, reinstall
-pip install igu
+pip install guard
 ```
 
 2. **Check Python path:**
@@ -80,17 +80,17 @@ which pip
 ```bash
 python -m venv venv
 source venv/bin/activate
-pip install igu
+pip install guard
 ```
 
-## Configuration Issues
+## Confguardration Issues
 
 ### Issue: Config file not found
 
 **Symptoms:**
 ```bash
 $ guard run --batch test --target-version 1.20.0
-Error: Configuration file not found: /home/user/.igu/config.yaml
+Error: Confguardration file not found: /home/user/.guard/config.yaml
 ```
 
 **Solutions:**
@@ -110,12 +110,12 @@ cp examples/config.yaml.example ~/.guard/config.yaml
 guard run --config /path/to/config.yaml --batch test --target-version 1.20.0
 ```
 
-### Issue: Invalid configuration
+### Issue: Invalid confguardration
 
 **Symptoms:**
 ```bash
 $ guard validate
-Error: Invalid configuration: 1 validation error for GuardConfig
+Error: Invalid confguardration: 1 validation error for GuardConfig
 aws
   field required (type=value_error.missing)
 ```
@@ -153,9 +153,9 @@ Error: Unable to locate credentials
 
 **Solutions:**
 
-1. **Configure AWS CLI:**
+1. **Confguardre AWS CLI:**
 ```bash
-aws configure
+aws confguardre
 # Enter: Access Key ID, Secret Access Key, Region, Output format
 ```
 
@@ -168,10 +168,10 @@ export AWS_REGION=us-east-1
 
 3. **Use AWS profile:**
 ```bash
-export AWS_PROFILE=igu-dev
+export AWS_PROFILE=guard-dev
 # Or in config:
 aws:
-  profile: igu-dev
+  profile: guard-dev
 ```
 
 ### Issue: DynamoDB table not accessible
@@ -583,7 +583,7 @@ kubectl logs -n istio-system -l app=istio-ingressgateway --tail=100
 2. **Check for known issues:**
    - Review Istio release notes for target version
    - Check for breaking changes
-   - Look for configuration incompatibilities
+   - Look for confguardration incompatibilities
 
 3. **Rollback:**
 ```bash

@@ -1,6 +1,5 @@
 """Registry for managing health checks."""
 
-from typing import Any
 
 from guard.core.models import ClusterConfig
 from guard.interfaces.check import Check

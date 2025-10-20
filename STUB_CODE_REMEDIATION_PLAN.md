@@ -3,10 +3,13 @@
 ## Executive Summary
 
 **Analysis Date:** 2025-10-20
+**Project Stage:** Pre-Alpha (no external users)
 **Files Analyzed:** 74 Python files
 **Issues Found:** 9 incomplete implementations across 6 files
 **Critical Blockers:** 0
 **Status:** ✅ Core upgrade workflows are fully functional
+
+**Note on Legacy Code:** Since GUARD is in pre-alpha stage with no external users, legacy/incomplete code will be **removed entirely** rather than deprecated. No backward compatibility needed.
 
 ---
 
@@ -354,10 +357,10 @@ def get_config_path() -> Path:
 
 ---
 
-### Issue #4: Missing Flux Config Update in Legacy GitOps Manager
-**File:** `src/guard/gitops/manager.py:49`
+### Issue #4: Remove Legacy GitOps Manager
+**File:** `src/guard/gitops/manager.py`
 **Severity:** P3 - Low
-**Effort:** Low (1-2 hours)
+**Effort:** Low (30 minutes)
 
 **Current State:**
 ```python
@@ -369,46 +372,57 @@ def create_upgrade_mr(self, cluster, target_version, pre_check_results):
 ```
 
 **Problem:**
-Function doesn't update Flux HelmRelease YAML files.
+Function doesn't update Flux HelmRelease YAML files and is superseded by `gitops/gitops_orchestrator.py`.
 
 **Solution:**
-⚠️ **RECOMMENDATION: Deprecate this file instead of completing it.**
+⚠️ **RECOMMENDATION: Delete this file entirely.**
 
-This is legacy code. The primary implementation in `gitops/gitops_orchestrator.py` is complete and handles Flux updates properly. This file should be:
-1. Marked as deprecated with clear docstring
-2. Add deprecation warning when used
-3. Update documentation to use `GitopsOrchestrator` instead
+Since GUARD is in **pre-alpha stage**, there's no need for deprecation warnings or backward compatibility. The primary implementation in `gitops/gitops_orchestrator.py` is complete and handles Flux updates properly.
 
-**Implementation:**
-```python
-import warnings
+**Implementation Steps:**
 
-class GitopsManager:
-    """
-    DEPRECATED: Use GitopsOrchestrator instead.
+1. **Verify no imports exist:**
 
-    This class is a legacy implementation and will be removed in a future version.
-    For new code, use src.guard.gitops.gitops_orchestrator.GitopsOrchestrator.
-    """
-
-    def __init__(self, ...):
-        warnings.warn(
-            "GitopsManager is deprecated. Use GitopsOrchestrator instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
+```bash
+# Check if anything imports GitopsManager
+grep -r "from.*gitops.manager import" src/
+grep -r "gitops.manager" src/
 ```
 
-**Files to Modify:**
+2. **Remove the file:**
+
+```bash
+rm src/guard/gitops/manager.py
+```
+
+3. **Remove corresponding tests if they exist:**
+
+```bash
+rm tests/unit/gitops/test_manager.py 2>/dev/null || true
+```
+
+4. **Update __init__.py if necessary:**
+
+```python
+# In src/guard/gitops/__init__.py
+# Remove any GitopsManager exports
+```
+
+**Verification:**
+- Run full test suite to ensure nothing breaks
+- Check for any lingering references in documentation
+- Confirm `GitopsOrchestrator` is the sole implementation
+
+**Files to Delete:**
 - `src/guard/gitops/manager.py`
-- Documentation/CLAUDE.md (note deprecation)
+- `tests/unit/gitops/test_manager.py` (if exists)
 
 ---
 
-### Issue #5: Legacy Metrics Comparator
-**File:** `src/guard/validation/metrics_comparator.py:34`
+### Issue #5: Remove Legacy Metrics Comparator
+**File:** `src/guard/validation/metrics_comparator.py`
 **Severity:** P3 - Low
-**Effort:** Low (1 hour)
+**Effort:** Low (30 minutes)
 
 **Current State:**
 ```python
@@ -424,42 +438,53 @@ def compare_metrics(self, baseline: dict, current: dict):
 ```
 
 **Problem:**
-Always returns success without comparing metrics.
+Always returns success without comparing metrics and is superseded by better implementations.
 
 **Solution:**
-⚠️ **RECOMMENDATION: Deprecate this file instead of completing it.**
+⚠️ **RECOMMENDATION: Delete this file entirely.**
 
-This is superseded by:
+Since GUARD is in **pre-alpha stage**, no deprecation needed. This is superseded by:
+
 - `validation/validation_orchestrator.py` - Comprehensive validation framework
 - `services/istio/validators/latency.py` - IstioLatencyValidator
 - `services/istio/validators/error_rate.py` - IstioErrorRateValidator
 
-**Implementation:**
-```python
-import warnings
+**Implementation Steps:**
 
-class MetricsComparator:
-    """
-    DEPRECATED: Use validation_orchestrator.py with specific validators instead.
+1. **Verify no imports exist:**
 
-    This class is superseded by:
-    - validation.validation_orchestrator.ValidationOrchestrator
-    - services.istio.validators.latency.IstioLatencyValidator
-    - services.istio.validators.error_rate.IstioErrorRateValidator
-    """
-
-    def __init__(self, ...):
-        warnings.warn(
-            "MetricsComparator is deprecated. Use ValidationOrchestrator with "
-            "specific validators instead.",
-            DeprecationWarning,
-            stacklevel=2
-        )
+```bash
+# Check if anything imports MetricsComparator
+grep -r "from.*metrics_comparator import" src/
+grep -r "metrics_comparator" src/
 ```
 
-**Files to Modify:**
+2. **Remove the file:**
+
+```bash
+rm src/guard/validation/metrics_comparator.py
+```
+
+3. **Remove corresponding tests if they exist:**
+
+```bash
+rm tests/unit/validation/test_metrics_comparator.py 2>/dev/null || true
+```
+
+4. **Update __init__.py if necessary:**
+
+```python
+# In src/guard/validation/__init__.py
+# Remove any MetricsComparator exports
+```
+
+**Verification:**
+- Run full test suite to ensure nothing breaks
+- Confirm `ValidationOrchestrator` and specific validators are used instead
+
+**Files to Delete:**
 - `src/guard/validation/metrics_comparator.py`
-- Remove imports from other files if present
+- `tests/unit/validation/test_metrics_comparator.py` (if exists)
 
 ---
 
@@ -711,8 +736,8 @@ Week 1 (Sprint 1 - P2 Issues):
 └── Day 4-5: Issue #3.5 (IGU to GUARD naming cleanup)
 
 Week 2 (Sprint 2 - P3 Issues):
-├── Day 1: Issue #4 (Deprecate legacy GitOps manager)
-├── Day 1: Issue #5 (Deprecate legacy metrics comparator)
+├── Day 1: Issue #4 (Remove legacy GitOps manager)
+├── Day 1: Issue #5 (Remove legacy metrics comparator)
 ├── Day 2: Issue #6 (User lookup for MR assignment)
 └── Day 2: Issue #7 (TODO cleanup)
 
@@ -760,7 +785,7 @@ Backlog (Future Sprint):
 - ✅ All "igu" references renamed to "guard" with backward compatibility
 
 ### Sprint 2 (P3)
-- ✅ Legacy code properly deprecated with warnings
+- ✅ Legacy code removed (no deprecation needed in pre-alpha)
 - ✅ MRs automatically assigned to cluster owners
 - ✅ Zero TODO comments in production code
 
@@ -777,24 +802,27 @@ Backlog (Future Sprint):
    - Create feature branch: `feature/stub-code-remediation`
    - Implement changes incrementally with tests
    - Ensure 90%+ test coverage maintained
+   - Remove legacy files cleanly (no deprecation needed for pre-alpha)
 
 2. **Testing:**
    - Run full test suite: `pytest --cov=guard --cov-report=html`
+   - Verify no broken imports after file removals
    - Manual testing against dev cluster
    - Peer review all changes
 
 3. **Deployment:**
    - Create GitLab MR with this plan attached
-   - Get approval from at least 2 reviewers
+   - Get approval from at least 1 reviewer (pre-alpha flexibility)
    - Merge to main after CI passes
    - Deploy to test environment first
-   - Monitor for 48 hours before prod rollout
+   - Monitor for 24-48 hours before prod rollout
 
 4. **Validation:**
    - Run upgrade against test batch
-   - Verify new validation checks work
-   - Confirm deprecated code warnings appear
+   - Verify new validation checks work (sidecar versions, StatefulSet/DaemonSet readiness)
+   - Confirm legacy files are removed and imports updated
    - Check logs for any regressions
+   - Validate IGU→GUARD naming changes work correctly
 
 ---
 
@@ -817,8 +845,8 @@ P2 Issues (Critical Path):
     └── src/guard/core/config.py (backward compatibility)
 
 P3 Issues (Nice-to-Have):
-├── src/guard/gitops/manager.py (deprecate)
-├── src/guard/validation/metrics_comparator.py (deprecate)
+├── src/guard/gitops/manager.py (remove)
+├── src/guard/validation/metrics_comparator.py (remove)
 ├── src/guard/clients/gitlab_client.py
 └── src/guard/gitops/gitops_orchestrator.py
 
@@ -838,14 +866,19 @@ P4 Issues (Enhancement):
 ## Questions for Team Discussion
 
 1. **LLM Integration:** Should we prioritize LLM failure analysis or defer to backlog?
-2. **Legacy Code:** Should deprecated files be removed entirely or kept with warnings?
+2. **Legacy Code Removal:** Confirm that removing legacy files without deprecation is acceptable for pre-alpha stage
 3. **StatefulSet Safety:** Do we need additional safeguards for StatefulSet restarts?
 4. **Cost:** What's the acceptable cost per LLM analysis call?
 5. **Testing:** Should we require integration tests against real clusters?
+6. **Naming Migration:** Should we coordinate AWS Secret Manager path changes with ops team before renaming?
 
 ---
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 **Last Updated:** 2025-10-20
 **Author:** Generated by Claude Code (Systematic Codebase Analysis)
 **Review Required:** Yes - Team review recommended before implementation
+
+**Change Log:**
+- v1.1: Updated to remove legacy code instead of deprecating (pre-alpha stage)
+- v1.0: Initial comprehensive stub code analysis and remediation plan

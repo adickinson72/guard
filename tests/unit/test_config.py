@@ -71,7 +71,7 @@ def test_guard_config_from_dict():
     assert len(config.batches) == 1
 
 
-def test_igu_config_from_file():
+def test_guard_config_from_file():
     """Test loading config from YAML file."""
     config_data = {
         "aws": {"region": "us-west-2"},
@@ -99,13 +99,13 @@ def test_igu_config_from_file():
         Path(temp_path).unlink()
 
 
-def test_igu_config_from_file_not_found():
+def test_guard_config_from_file_not_found():
     """Test error when config file not found."""
     with pytest.raises(ConfigurationError, match="Configuration file not found"):
         GuardConfig.from_file("/nonexistent/config.yaml")
 
 
-def test_igu_config_from_file_invalid_yaml():
+def test_guard_config_from_file_invalid_yaml():
     """Test error when YAML is invalid."""
     with tempfile.NamedTemporaryFile(mode="w", suffix=".yaml", delete=False) as f:
         f.write("invalid: yaml: content: [")
@@ -118,7 +118,7 @@ def test_igu_config_from_file_invalid_yaml():
         Path(temp_path).unlink()
 
 
-def test_igu_config_from_file_invalid_schema():
+def test_guard_config_from_file_invalid_schema():
     """Test error when config schema is invalid."""
     config_data = {
         "aws": {"region": "us-east-1"},

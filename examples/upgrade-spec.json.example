@@ -1,10 +1,10 @@
 {
   "_comment": "Upgrade Specification Example (JSON)",
-  "_usage": "igu run --batch prod-wave-1 --upgrade-spec upgrade-spec.json",
+  "_usage": "guard run --batch prod-wave-1 --upgrade-spec upgrade-spec.json",
   "_important_fail_fast_behavior": [
     "All paths MUST exist in the target HelmRelease file",
     "If a path doesn't exist, the upgrade will FAIL immediately",
-    "This prevents accidental configuration corruption from typos",
+    "This prevents accidental confguardration corruption from typos",
     "Example: 'spec.chart.speck.version' (typo) will FAIL instead of silently creating a wrong field",
     "To create new fields, ensure the parent path exists first"
   ],

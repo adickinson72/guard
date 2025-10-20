@@ -1,7 +1,6 @@
 """Cloud provider interface for AWS/cloud operations."""
 
 from abc import ABC, abstractmethod
-from typing import Any
 
 from guard.interfaces.cloud_types import CloudCredentials, ClusterInfo, ClusterToken
 

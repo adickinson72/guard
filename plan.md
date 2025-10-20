@@ -12,7 +12,7 @@
 - [Workflow Phases](#workflow-phases)
 - [Technology Stack](#technology-stack)
 - [Project Structure](#project-structure)
-- [Configuration](#configuration)
+- [Confguardration](#confguardration)
 - [Security Considerations](#security-considerations)
 - [Future Enhancements](#future-enhancements)
 
@@ -30,7 +30,7 @@ Managing Istio upgrades across 75 EKS clusters using FluxCD and GitOps is comple
 **Solution:**
 GUARD automates the entire Istio upgrade lifecycle with:
 - **Automated pre-upgrade health checks** using Datadog metrics and Kubernetes state
-- **GitLab MR creation** with automated configuration updates
+- **GitLab MR creation** with automated confguardration updates
 - **Progressive rollout strategy** (test → dev → staging → prod batches)
 - **Post-upgrade validation** with automated rollback on failure
 - **Optional LLM-powered analysis** for failure investigation
@@ -95,7 +95,7 @@ GUARD automates the entire Istio upgrade lifecycle with:
 ### Data Flow
 
 ```
-1. Pre-Upgrade (igu run --batch prod-wave-1)
+1. Pre-Upgrade (guard run --batch prod-wave-1)
    ┌─────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────┐
    │ CLI │───>│ Cluster Reg  │───>│ Pre-Check    │───>│ GitLab   │
    └─────┘    │ (DynamoDB)   │    │ (DD + K8s)   │    │ MR       │
@@ -105,7 +105,7 @@ GUARD automates the entire Istio upgrade lifecycle with:
 2. Human Review & Merge MR                              [WAIT GATE]
                                                               │
                                                               ▼
-3. Post-Upgrade (igu monitor --batch prod-wave-1)
+3. Post-Upgrade (guard monitor --batch prod-wave-1)
    ┌─────┐    ┌──────────────┐    ┌──────────────┐    ┌──────────┐
    │ CLI │───>│ Flux Sync    │───>│ Post-Check   │───>│ Report   │
    └─────┘    │ Monitor      │    │ (DD + K8s)   │    │ Success  │
@@ -129,51 +129,51 @@ GUARD automates the entire Istio upgrade lifecycle with:
 **Commands:**
 
 ```python
-# igu run - Pre-check and create upgrade MR
-igu run --batch <batch-name> \
+# guard run - Pre-check and create upgrade MR
+guard run --batch <batch-name> \
         --target-version <istio-version> \
         --config <config-file> \
         [--dry-run] \
         [--parallelism <num>] \
         [--mr-strategy batch|per-cluster]
 
-# igu monitor - Post-upgrade validation
-igu monitor --batch <batch-name> \
+# guard monitor - Post-upgrade validation
+guard monitor --batch <batch-name> \
             --config <config-file> \
             [--soak-period <minutes>] \
             [--parallelism <num>]
 
-# igu rollback - Manual rollback trigger
-igu rollback --batch <batch-name> \
+# guard rollback - Manual rollback trigger
+guard rollback --batch <batch-name> \
              --config <config-file>
 
-# igu list - List clusters and their status
-igu list [--batch <batch-name>] \
+# guard list - List clusters and their status
+guard list [--batch <batch-name>] \
          [--environment <env>] \
          [--format json|table]
 
-# igu status - Show current workflow status
-igu status --batch <batch-name> \
+# guard status - Show current workflow status
+guard status --batch <batch-name> \
            [--format json|table]
 
-# igu diff - Preview configuration changes
-igu diff --batch <batch-name> \
+# guard diff - Preview confguardration changes
+guard diff --batch <batch-name> \
          --target-version <istio-version> \
          [--format yaml|unified]
 
-# igu resume - Resume a failed workflow
-igu resume --batch <batch-name> \
+# guard resume - Resume a failed workflow
+guard resume --batch <batch-name> \
            [--from-step <step>]
 
-# igu validate - Validate configuration and connectivity (ENHANCED)
-igu validate --config <config-file> \
+# guard validate - Validate confguardration and connectivity (ENHANCED)
+guard validate --config <config-file> \
              [--check-connectivity] \
              [--check-permissions]
 ```
 
 **Responsibilities:**
 - Parse command-line arguments
-- Load configuration
+- Load confguardration
 - Initialize logging and observability
 - Orchestrate workflow execution
 - **Enforce rollout sequencing** (prevent prod-wave-2 if prod-wave-1 not completed)
@@ -361,7 +361,7 @@ class ClusterRegistry:
         return True, "All prerequisites met"
 ```
 
-**Example batch_order configuration:**
+**Example batch_order confguardration:**
 ```yaml
 # In config.yaml
 batch_order:
@@ -403,7 +403,7 @@ class KubernetesHealthCheck(HealthCheck):
     def run(self, cluster: ClusterConfig) -> CheckResult:
         # Check node status
         # Verify Istio pods in istio-system namespace
-        # Check webhook configurations
+        # Check webhook confguardrations
         pass
 
 class IstioCRDCheck(HealthCheck):
@@ -472,7 +472,7 @@ class PreCheckEngine:
 | **K8s-Istio Compatibility** | **K8s version API** | **K8s version in compatibility matrix** |
 | **Istio CRDs** | **`kubectl get crds`** | **All required CRDs present with compatible versions** |
 | Istio Pods | `kubectl get pods -n istio-system` | All pods `Running`, `Ready` |
-| Istio Webhooks | `kubectl get validatingwebhookconfigurations` | Webhooks present and healthy |
+| Istio Webhooks | `kubectl get validatingwebhookconfguardrations` | Webhooks present and healthy |
 | Istio Config | `istioctl analyze` | No validation issues |
 | Datadog Baseline | Datadog Metrics API | Error rate < 0.1%, no active alerts |
 
@@ -720,7 +720,7 @@ class AWSClient:
         import subprocess
 
         # Assume role if provided
-        session = self.assume_role(role_arn, f"igu-{cluster_name}") if role_arn else boto3.Session()
+        session = self.assume_role(role_arn, f"guard-{cluster_name}") if role_arn else boto3.Session()
         eks = session.client('eks', region_name=region)
 
         # Get cluster details
@@ -774,13 +774,13 @@ class AWSClient:
 **Datadog Client:**
 ```python
 # src/guard/clients/datadog_client.py
-from datadog_api_client import ApiClient, Configuration
+from datadog_api_client import ApiClient, Confguardration
 from datadog_api_client.v1.api.metrics_api import MetricsApi
 from datadog_api_client.v1.api.monitors_api import MonitorsApi
 
 class DatadogClient:
     def __init__(self, api_key: str, app_key: str, site: str = "datadoghq.com"):
-        config = Configuration()
+        config = Confguardration()
         config.api_key["apiKeyAuth"] = api_key
         config.api_key["appKeyAuth"] = app_key
         config.server_variables["site"] = site
@@ -863,7 +863,7 @@ class IstioctlWrapper:
 2. **AWS IAM Roles:**
    - Create IAM role for GUARD execution (with STS assume-role permissions)
    - Create per-cluster IAM roles with EKS access
-   - **Note:** EKS access entries must be configured via Terraform (out-of-scope for GUARD)
+   - **Note:** EKS access entries must be confguardred via Terraform (out-of-scope for GUARD)
 
 3. **Secrets Manager:**
    ```bash
@@ -878,13 +878,13 @@ class IstioctlWrapper:
        --secret-string '{"api_key":"xxx","app_key":"xxx"}'
    ```
 
-4. **Configuration File:**
-   Create `~/.guard/config.yaml` (see Configuration section below)
+4. **Confguardration File:**
+   Create `~/.guard/config.yaml` (see Confguardration section below)
 
 5. **Dependencies:**
    ```bash
    # Install GUARD
-   pip install igu
+   pip install guard
 
    # Install istioctl
    curl -L https://istio.io/downloadIstio | sh -
@@ -896,18 +896,18 @@ class IstioctlWrapper:
 
 ### Phase 1: Pre-Upgrade Status Check (The Datadog Gate)
 
-Goal: Ensure the target batch of clusters is healthy *and* correctly configured before creating an MR.
+Goal: Ensure the target batch of clusters is healthy *and* correctly confguardred before creating an MR.
 | Step | Action | Tools/API Used | Success Criteria |
 |---|---|---|---|
 | 1.1 Authentication | GUARD authenticates with AWS STS to AssumeRole into the target EKS cluster(s) and establishes a temporary kubeconfig. | AWS STS API | IAM role assumption successful. |
-| 1.2 Kubernetes Sanity | Verify existing Istio control plane and webhooks. | `kubectl` | (A) All `istiod`/Gateway pods are `Running`/`Ready`. (B) `ValidatingWebhookConfiguration` & `MutatingWebhookConfiguration` for Istio are present and healthy. |
-| 1.3 **(New)** Istio Config Validation | Run `istioctl analyze` to detect any pre-existing configuration errors (e.g., broken `VirtualServices`). | `istioctl analyze` | Command returns `No validation issues found`. |
+| 1.2 Kubernetes Sanity | Verify existing Istio control plane and webhooks. | `kubectl` | (A) All `istiod`/Gateway pods are `Running`/`Ready`. (B) `ValidatingWebhookConfguardration` & `MutatingWebhookConfguardration` for Istio are present and healthy. |
+| 1.3 **(New)** Istio Config Validation | Run `istioctl analyze` to detect any pre-existing confguardration errors (e.g., broken `VirtualServices`). | `istioctl analyze` | Command returns `No validation issues found`. |
 | 1.4 Datadog Baseline Check | Query Datadog for baseline metrics and *active alerts*. | Datadog Metrics & Monitors API | (A) Control Plane Health: Zero Istiod errors. (B) Data Plane Error Rate: Critical services 5xx rate \< 0.1%. (C) **Alerts: Zero active, non-silenced Datadog alerts** for the target cluster/services. |
 | 1.5 Result & Halt | If any cluster in the batch fails *any* check, the GUARD halts for that *entire batch* and reports the failure. | GUARD CLI Output / Status Log | All checks passed for all clusters in the batch. |
 
 ### Phase 2: GitOps Change Management
 
-Goal: Automate the MR creation for the Istio version bump. Executed by `igu run`.
+Goal: Automate the MR creation for the Istio version bump. Executed by `guard run`.
 
 **CRITICAL: CRD Upgrade Strategy**
 Istio CRDs must be upgraded BEFORE the control plane. GUARD will handle this automatically:
@@ -919,19 +919,19 @@ Istio CRDs must be upgraded BEFORE the control plane. GUARD will handle this aut
 |---|---|---|---|
 | 2.1 Branch Creation | Creates a new branch in the GitLab repository (e.g., `feature/istio-1.20.0-prod-wave-1`). | GitLab API / Git CLI | Branch name incorporates version and batch. |
 | **2.2 CRD Update** | **Update Istio CRD manifests to target version** | **File Patching** | **Separate commit ensuring CRDs upgrade first** |
-| 2.3 Configuration Patch | Locate and update the Flux config file (HelmRelease/Kustomization) for control plane to the Target Version. | File Patching | Path to file is read from the `config_file_path` field in the Cluster Registry. Support multiple patterns (chart.version, image.tag, global.tag). |
+| 2.3 Confguardration Patch | Locate and update the Flux config file (HelmRelease/Kustomization) for control plane to the Target Version. | File Patching | Path to file is read from the `config_file_path` field in the Cluster Registry. Support multiple patterns (chart.version, image.tag, global.tag). |
 | 2.4 Flux Resource Ordering | Verify or add `dependsOn` to ensure CRD resources reconcile before control plane | YAML Parsing | Ensures safe upgrade sequence |
 | 2.5 Commit & Push | Commit and push the new branch. | GitLab API / Git CLI | `chore: Istio upgrade to vX.Y.Z for [BATCH]` |
 | 2.6 Merge Request (MR) Creation | Opens a Draft/WIP Merge Request. **Enhancement:** Pre-populates with pre-upgrade health report, Datadog links, and **auto-assigns** to the team via the `owner_handle` from the Cluster Registry (resolved to user ID). | GitLab API | GUARD `run` command finishes here. The process now waits for a human to approve and merge this MR. Supports `--mr-strategy per-cluster` to create individual MRs per cluster for blast radius isolation. |
 
 ### Phase 3: Upgrade Execution & Post-Upgrade Validation
 
-Goal: Monitor the Flux sync and perform data-driven health validation. Executed by `igu monitor`.
+Goal: Monitor the Flux sync and perform data-driven health validation. Executed by `guard monitor`.
 | Step | Action | Tools/API Used | Validation/Monitoring Detail |
 |---|---|---|---|
 | 3.1 **(Enhanced)** Monitor Flux Sync | **Triggered by CI/CD pipeline** after MR is merged. GUARD monitors Flux reconciliation. | `kubectl get helmrelease/kustomization`, `kubectl get deployment istiod` | Wait for Flux status `Ready: True` AND `istiod` deployment to reflect the *new* image tag and have all replicas ready. |
 | 3.2 Soak Period | GUARD waits for a defined Soak Period (e.g., 60 minutes) to collect post-upgrade metrics. | GUARD Internal Timer | |
-| 3.3 Post-Upgrade Status Check | Verify the new Istio control plane and configuration. | `kubectl`, `istioctl` | (A) New `istiod` deployment is `Ready`. (B) `istioctl ps` shows all proxies `SYNCED`. (C) **`istioctl analyze`** reports no new issues. (D) `istioctl version` confirms all components match the target version. |
+| 3.3 Post-Upgrade Status Check | Verify the new Istio control plane and confguardration. | `kubectl`, `istioctl` | (A) New `istiod` deployment is `Ready`. (B) `istioctl ps` shows all proxies `SYNCED`. (C) **`istioctl analyze`** reports no new issues. (D) `istioctl version` confirms all components match the target version. |
 | 3.4 Datadog Validation | Compare Post-Upgrade Soak Period against the Pre-Upgrade Baseline. | Datadog Metrics Query API | (A) Latency: P95/P99 $\leq$ 10% change. (B) Error Rate: 5xx rate remains below SLO. (C) Saturation: Istio proxy CPU/Memory within 150% of baseline. (D) **Control Plane:** New Istiod XDS push times/errors are nominal. |
 | 3.5 **(Enhanced)** Success Reporting | On *success*, GUARD updates the Cluster Registry and reports back. | GUARD CLI, GitLab API | 1. Cluster Registry updated: `status: healthy`, `istio_version: <new>`. 2. Post a "Success" comment to the (now merged) GitLab MR. |
 | 3.6 **(New)** Failure Detection | If any check in 3.3 or 3.4 fails, GUARD updates the state and triggers rollback. | GUARD CLI | 1. Cluster Registry updated: `status: rollback-required`. 2. **Initiate Phase 5: Automated Rollback Protocol.** |
@@ -955,7 +955,7 @@ Goal: To safely and automatically return a failed cluster to its last known good
 | 5.3 Create Revert Commit | GUARD checks out the *original* (pre-upgrade) version of the Flux config file and commits it, effectively reverting the change. | Git CLI / File Patching | This commit undoes the change from Phase 2. |
 | 5.4 Create Rollback MR | GUARD creates a new MR (e.g., "**ROLLBACK: Istio Upgrade Failed for prod-wave-1**"). | GitLab API | MR is auto-assigned to the `owner_handle`, tagged `ROLLBACK`, and includes all failure data from Phase 3/4. |
 | 5.5 Alert & Wait | GUARD fires a PagerDuty/Slack alert with a direct link to the rollback MR. The tool **halts** and waits for a human to approve this rollback MR. | Notification Webhook | This is a critical safety gate. A human must approve the *revert* to prevent automated flapping or revert loops. |
-| 5.6 Monitor Rollback | (Optional) After the rollback MR is merged, `igu monitor` can be run again to validate the cluster has returned to the *old* version and is healthy. | `igu monitor`, `kubectl` | Cluster Registry status is updated to `status: failed-upgrade (rolled-back)`. |
+| 5.6 Monitor Rollback | (Optional) After the rollback MR is merged, `guard monitor` can be run again to validate the cluster has returned to the *old* version and is healthy. | `guard monitor`, `kubectl` | Cluster Registry status is updated to `status: failed-upgrade (rolled-back)`. |
 
 ---
 
@@ -1011,25 +1011,25 @@ pre-commit = "^3.6.0"
 ## Project Structure
 
 ```
-igu/
+guard/
 ├── .github/
 │   └── workflows/
 │       ├── ci.yml              # CI/CD pipeline
 │       └── release.yml         # Release automation
 ├── src/
-│   └── igu/
+│   └── guard/
 │       ├── __init__.py
 │       ├── __main__.py         # Entry point
 │       ├── cli/
 │       │   ├── __init__.py
 │       │   ├── main.py         # Main CLI commands
-│       │   ├── run.py          # igu run command
-│       │   ├── monitor.py      # igu monitor command
-│       │   ├── rollback.py     # igu rollback command
-│       │   └── list.py         # igu list command
+│       │   ├── run.py          # guard run command
+│       │   ├── monitor.py      # guard monitor command
+│       │   ├── rollback.py     # guard rollback command
+│       │   └── list.py         # guard list command
 │       ├── core/
 │       │   ├── __init__.py
-│       │   ├── config.py       # Configuration management
+│       │   ├── config.py       # Confguardration management
 │       │   ├── models.py       # Data models (ClusterConfig, etc.)
 │       │   └── exceptions.py   # Custom exceptions
 │       ├── registry/
@@ -1084,7 +1084,7 @@ igu/
 ├── docs/
 │   ├── getting-started.md
 │   ├── architecture.md
-│   ├── configuration.md
+│   ├── confguardration.md
 │   ├── contributing.md
 │   └── examples/
 │       ├── basic-usage.md
@@ -1103,14 +1103,14 @@ igu/
 
 ---
 
-## Configuration
+## Confguardration
 
-### Main Configuration File
+### Main Confguardration File
 
 `~/.guard/config.yaml`:
 
 ```yaml
-# GUARD Configuration File
+# GUARD Confguardration File
 
 # AWS Settings
 aws:
@@ -1191,18 +1191,18 @@ rollback:
   notification:
     enabled: true
     # Use secret reference instead of plaintext
-    webhook_secret_name: igu/notification-webhook
+    webhook_secret_name: guard/notification-webhook
     # Or PagerDuty integration key secret name
-    pagerduty_secret_name: igu/pagerduty-key
+    pagerduty_secret_name: guard/pagerduty-key
 
 # LLM Settings (Optional)
 llm:
   enabled: false
   provider: openai  # openai, anthropic, or custom
   model: gpt-4
-  api_key_secret: igu/llm-api-key  # Secret name in Secrets Manager
+  api_key_secret: guard/llm-api-key  # Secret name in Secrets Manager
 
-# Batch Configuration
+# Batch Confguardration
 batches:
   - name: test
     description: Test cluster
@@ -1284,7 +1284,7 @@ See Core Components > Cluster Registry section for the complete DynamoDB schema.
 
 ```bash
 # 1. Pre-check and create MR
-igu run --batch dev-wave-1 --target-version 1.20.0
+guard run --batch dev-wave-1 --target-version 1.20.0
 
 # Output:
 # ✓ Pre-checks passed for all clusters in batch 'dev-wave-1'
@@ -1294,7 +1294,7 @@ igu run --batch dev-wave-1 --target-version 1.20.0
 # 2. Human reviews and merges MR in GitLab UI
 
 # 3. GitLab CI/CD triggers monitoring (or run manually)
-igu monitor --batch dev-wave-1
+guard monitor --batch dev-wave-1
 
 # Output:
 # ⏳ Waiting for Flux sync...
@@ -1305,7 +1305,7 @@ igu monitor --batch dev-wave-1
 # ✓ All clusters healthy - upgrade successful!
 
 # 4. Proceed to next batch
-igu run --batch dev-wave-2 --target-version 1.20.0
+guard run --batch dev-wave-2 --target-version 1.20.0
 ```
 
 ### Failure Handling
@@ -1320,7 +1320,7 @@ igu run --batch dev-wave-2 --target-version 1.20.0
 # Human reviews rollback MR and merges
 
 # Optional: Monitor rollback
-igu monitor --batch prod-wave-1
+guard monitor --batch prod-wave-1
 ```
 
 ---
@@ -1372,7 +1372,7 @@ igu monitor --batch prod-wave-1
         "secretsmanager:GetSecretValue"
       ],
       "Resource": [
-        "arn:aws:secretsmanager:*:*:secret:igu/*"
+        "arn:aws:secretsmanager:*:*:secret:guard/*"
       ]
     }
   ]
@@ -1397,7 +1397,7 @@ igu monitor --batch prod-wave-1
 }
 ```
 
-**Note:** EKS access entries (for `kubectl` access) must be configured separately via Terraform.
+**Note:** EKS access entries (for `kubectl` access) must be confguardred separately via Terraform.
 
 ### 3. Network Security
 
@@ -1440,8 +1440,8 @@ statsd.increment('guard.upgrade.success', tags=['batch:prod-wave-1'])
 statsd.increment('guard.upgrade.failed', tags=['batch:prod-wave-1'])
 
 # Pre-check metrics
-statsd.histogram('igu.precheck.duration', 45.2, tags=['cluster:eks-prod'])
-statsd.increment('igu.precheck.failed', tags=['check:datadog_alerts'])
+statsd.histogram('guard.precheck.duration', 45.2, tags=['cluster:eks-prod'])
+statsd.increment('guard.precheck.failed', tags=['check:datadog_alerts'])
 
 # Validation metrics
 statsd.histogram('guard.validation.soak_period', 3600)
@@ -1526,7 +1526,7 @@ This plan has been enhanced based on comprehensive review by multiple AI models 
 
 ✅ **Parallelism & Concurrency** (lines 137-138, 144, 1125-1135)
 - Added `--parallelism` flag to CLI commands
-- Configurable `max_parallel_clusters` setting
+- Confguardrable `max_parallel_clusters` setting
 - Per-provider rate limiting (GitLab, Datadog, AWS APIs)
 - Prevents API throttling when operating at scale (75 clusters)
 
@@ -1575,16 +1575,16 @@ This plan has been enhanced based on comprehensive review by multiple AI models 
 ✅ **Rollout Sequencing** (lines 179, 347-374, 1129)
 - Enforces batch order (prevents prod-wave-2 before prod-wave-1)
 - Validates prerequisite batch completion
-- Configurable batch dependencies
+- Confguardrable batch dependencies
 - Prevents operator errors
 
 ### P1 - Enhanced Developer Experience
 
 ✅ **Enhanced CLI Commands** (lines 155-171)
-- `igu status` - Show current workflow status
-- `igu diff` - Preview configuration changes
-- `igu resume` - Resume failed workflows
-- `igu validate` - End-to-end connectivity testing
+- `guard status` - Show current workflow status
+- `guard diff` - Preview confguardration changes
+- `guard resume` - Resume failed workflows
+- `guard validate` - End-to-end connectivity testing
 
 ✅ **Per-Cluster MR Strategy** (line 138, 895, 1128)
 - Optional `--mr-strategy per-cluster` flag

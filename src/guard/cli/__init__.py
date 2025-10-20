@@ -1,1 +1,1 @@
-"""CLI module for IGU."""
+"""CLI module for GUARD."""

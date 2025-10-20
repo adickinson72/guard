@@ -39,7 +39,7 @@ tests/
 │   ├── test_validation_engine.py  # Validation logic
 │   ├── test_gitops_manager.py     # GitOps operations
 │   ├── test_rollback_engine.py    # Rollback logic
-│   ├── test_config.py             # Configuration loading
+│   ├── test_config.py             # Confguardration loading
 │   ├── test_flux_config.py        # Flux YAML updates
 │   └── test_metrics_comparator.py # Metrics comparison
 ├── integration/                   # Integration with external services
@@ -318,7 +318,7 @@ from guard.core.models import Cluster
 
 @pytest.fixture
 def test_config():
-    """Provide test configuration."""
+    """Provide test confguardration."""
     return GuardConfig.from_file("tests/fixtures/config.yaml")
 
 
