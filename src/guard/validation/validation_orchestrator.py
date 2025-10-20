@@ -61,10 +61,9 @@ class ValidationOrchestrator:
             duration=duration_minutes,
         )
 
+        # Fix: Compute start_time from single end_time for consistency
         end_time = datetime.utcnow()
-        start_time = datetime.utcnow().replace(microsecond=end_time.microsecond) - timedelta(
-            minutes=duration_minutes
-        )
+        start_time = end_time - timedelta(minutes=duration_minutes)
 
         # Get all required metrics from validators
         validators = self.registry.get_validators(cluster)
@@ -78,6 +77,7 @@ class ValidationOrchestrator:
 
         # Query each metric
         metrics_data = {}
+        failed_metrics = []
         tags = cluster.datadog_tags.model_dump()
 
         for metric_name in required_metrics:
@@ -91,12 +91,25 @@ class ValidationOrchestrator:
                 )
                 metrics_data[metric_name] = value
             except Exception as e:
-                logger.warning(
+                logger.error(
                     "metric_capture_failed",
                     metric_name=metric_name,
                     error=str(e),
                 )
-                metrics_data[metric_name] = 0.0
+                # Fix: Store None instead of 0.0 to indicate missing data
+                # This prevents masking monitoring failures
+                metrics_data[metric_name] = None
+                failed_metrics.append(metric_name)
+
+        # Warn if metrics are missing
+        if failed_metrics:
+            logger.warning(
+                "metrics_missing_in_baseline",
+                cluster_id=cluster.cluster_id,
+                failed_metrics=failed_metrics,
+                failed_count=len(failed_metrics),
+                total_count=len(required_metrics),
+            )
 
         snapshot = MetricsSnapshot(
             timestamp=end_time,
@@ -108,6 +121,7 @@ class ValidationOrchestrator:
             "baseline_captured",
             cluster_id=cluster.cluster_id,
             metric_count=len(metrics_data),
+            missing_count=len(failed_metrics),
         )
 
         return snapshot
@@ -139,6 +153,7 @@ class ValidationOrchestrator:
 
         # Query same metrics as baseline
         metrics_data = {}
+        failed_metrics = []
         tags = cluster.datadog_tags.model_dump()
 
         for metric_name in baseline.metrics.keys():
@@ -152,12 +167,24 @@ class ValidationOrchestrator:
                 )
                 metrics_data[metric_name] = value
             except Exception as e:
-                logger.warning(
+                logger.error(
                     "metric_capture_failed",
                     metric_name=metric_name,
                     error=str(e),
                 )
-                metrics_data[metric_name] = 0.0
+                # Fix: Store None instead of 0.0 to indicate missing data
+                metrics_data[metric_name] = None
+                failed_metrics.append(metric_name)
+
+        # Warn if metrics are missing
+        if failed_metrics:
+            logger.warning(
+                "metrics_missing_in_current",
+                cluster_id=cluster.cluster_id,
+                failed_metrics=failed_metrics,
+                failed_count=len(failed_metrics),
+                total_count=len(baseline.metrics),
+            )
 
         snapshot = MetricsSnapshot(
             timestamp=end_time,
@@ -169,6 +196,7 @@ class ValidationOrchestrator:
             "current_metrics_captured",
             cluster_id=cluster.cluster_id,
             metric_count=len(metrics_data),
+            missing_count=len(failed_metrics),
         )
 
         return snapshot

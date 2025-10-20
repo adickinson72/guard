@@ -5,11 +5,11 @@ aws:
   region: us-east-1
   profile: default  # Optional: AWS profile to use
   dynamodb:
-    table_name: igu-cluster-registry
+    table_name: guard-cluster-registry
     region: us-east-1
   secrets_manager:
-    gitlab_token_secret: igu/gitlab-token
-    datadog_credentials_secret: igu/datadog-credentials
+    gitlab_token_secret: guard/gitlab-token
+    datadog_credentials_secret: guard/datadog-credentials
 
 # GitLab Settings
 gitlab:

@@ -1,13 +1,13 @@
 """Initialize rate limiters from configuration."""
 
-from guard.core.config import IguConfig, RateLimitsConfig
+from guard.core.config import GuardConfig, RateLimitsConfig
 from guard.utils.logging import get_logger
 from guard.utils.rate_limiter import get_rate_limiter
 
 logger = get_logger(__name__)
 
 
-def initialize_rate_limiters(config: IguConfig) -> None:
+def initialize_rate_limiters(config: GuardConfig) -> None:
     """Initialize rate limiters from configuration.
 
     This function should be called once at application startup to register
@@ -51,7 +51,7 @@ def initialize_rate_limiters(config: IguConfig) -> None:
 def initialize_rate_limiters_from_config(rate_limits: RateLimitsConfig) -> None:
     """Initialize rate limiters directly from RateLimitsConfig.
 
-    Convenience function when you have RateLimitsConfig but not full IguConfig.
+    Convenience function when you have RateLimitsConfig but not full GuardConfig.
 
     Args:
         rate_limits: Rate limits configuration

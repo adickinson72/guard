@@ -59,31 +59,31 @@ GUARD is a Python-based automation tool that orchestrates safe, progressive Isti
 │   User/CI    │
 └──────┬───────┘
        │
-       │ igu run --batch prod-wave-1 --target-version 1.20.0
+       │ guard run --batch prod-wave-1 --target-version 1.20.0
        │
 ┌──────▼──────────────────────────────────────────────────────┐
-│  CLI (src/igu/cli/main.py)                                  │
+│  CLI (src/guard/cli/main.py)                                  │
 │  • Argument parsing                                          │
 │  • Command routing                                           │
 │  • Output formatting                                         │
 └──────┬──────────────────────────────────────────────────────┘
        │
 ┌──────▼──────────────────────────────────────────────────────┐
-│  Core Configuration (src/igu/core/config.py)                │
+│  Core Configuration (src/guard/core/config.py)                │
 │  • Load YAML config                                          │
 │  • Validate settings                                         │
 │  • Provide typed access to configuration                    │
 └──────┬──────────────────────────────────────────────────────┘
        │
 ┌──────▼──────────────────────────────────────────────────────┐
-│  Cluster Registry (src/igu/registry/cluster_registry.py)    │
+│  Cluster Registry (src/guard/registry/cluster_registry.py)    │
 │  • Query DynamoDB for cluster metadata                      │
 │  • Filter clusters by batch                                 │
 │  • Update cluster state                                     │
 └──────┬──────────────────────────────────────────────────────┘
        │
 ┌──────▼──────────────────────────────────────────────────────┐
-│  Pre-Check Engine (src/igu/checks/pre_check_engine.py)      │
+│  Pre-Check Engine (src/guard/checks/pre_check_engine.py)      │
 │  • Run health checks on each cluster:                       │
 │    - Kubernetes API health                                  │
 │    - Istio control plane health (istioctl analyze)          │
@@ -93,7 +93,7 @@ GUARD is a Python-based automation tool that orchestrates safe, progressive Isti
 └──────┬──────────────────────────────────────────────────────┘
        │
 ┌──────▼──────────────────────────────────────────────────────┐
-│  GitOps Manager (src/igu/gitops/manager.py)                 │
+│  GitOps Manager (src/guard/gitops/manager.py)                 │
 │  • Clone GitLab repository                                  │
 │  • Create feature branch                                    │
 │  • Update Flux HelmRelease configs                          │
@@ -102,10 +102,10 @@ GUARD is a Python-based automation tool that orchestrates safe, progressive Isti
        │
        │ [User manually reviews and merges MR]
        │
-       │ igu monitor --batch prod-wave-1
+       │ guard monitor --batch prod-wave-1
        │
 ┌──────▼──────────────────────────────────────────────────────┐
-│  Validation Engine (src/igu/validation/engine.py)           │
+│  Validation Engine (src/guard/validation/engine.py)           │
 │  • Wait for Flux sync                                       │
 │  • Monitor pod rollout                                      │
 │  • Soak period                                              │
@@ -116,7 +116,7 @@ GUARD is a Python-based automation tool that orchestrates safe, progressive Isti
        │ [On failure]
        │
 ┌──────▼──────────────────────────────────────────────────────┐
-│  Rollback Engine (src/igu/rollback/engine.py)               │
+│  Rollback Engine (src/guard/rollback/engine.py)               │
 │  • Create rollback MR (revert version)                      │
 │  • Optional: LLM analysis of failure                        │
 │  • Send notifications (Slack, PagerDuty)                    │
@@ -127,21 +127,21 @@ GUARD is a Python-based automation tool that orchestrates safe, progressive Isti
 
 ### CLI Layer
 
-**Location**: `src/igu/cli/main.py`
+**Location**: `src/guard/cli/main.py`
 
 Handles user interaction and command routing.
 
 **Commands**:
-- `igu validate` - Validate configuration
-- `igu list` - List clusters
-- `igu run` - Execute upgrade workflow
-- `igu monitor` - Monitor upgrade progress
-- `igu rollback` - Trigger manual rollback
-- `igu registry` - Manage cluster registry
+- `guard validate` - Validate configuration
+- `guard list` - List clusters
+- `guard run` - Execute upgrade workflow
+- `guard monitor` - Monitor upgrade progress
+- `guard rollback` - Trigger manual rollback
+- `guard registry` - Manage cluster registry
 
 ### Core Models
 
-**Location**: `src/igu/core/models.py`
+**Location**: `src/guard/core/models.py`
 
 Defines core data structures:
 
@@ -177,7 +177,7 @@ class ValidationResult:
 
 ### Cluster Registry
 
-**Location**: `src/igu/registry/cluster_registry.py`
+**Location**: `src/guard/registry/cluster_registry.py`
 
 Manages cluster metadata in DynamoDB.
 
@@ -192,7 +192,7 @@ Manages cluster metadata in DynamoDB.
 
 ### Pre-Check Engine
 
-**Location**: `src/igu/checks/pre_check_engine.py`
+**Location**: `src/guard/checks/pre_check_engine.py`
 
 Runs comprehensive health checks before upgrades.
 
@@ -219,20 +219,20 @@ class PreCheckEngine:
     async def run_pre_checks(
         self,
         clusters: list[Cluster],
-        config: IguConfig
+        config: GuardConfig
     ) -> dict[str, list[HealthCheckResult]]:
         """Run all pre-checks for a list of clusters."""
 ```
 
 ### GitOps Manager
 
-**Location**: `src/igu/gitops/manager.py`
+**Location**: `src/guard/gitops/manager.py`
 
 Manages GitLab operations.
 
 **Workflow**:
 1. Clone repository
-2. Create branch: `igu/upgrade-istio-{version}-{batch}-{timestamp}`
+2. Create branch: `guard/upgrade-istio-{version}-{batch}-{timestamp}`
 3. Update Flux HelmRelease files
 4. Create commit
 5. Push branch
@@ -240,7 +240,7 @@ Manages GitLab operations.
 
 **Flux Config Updates**:
 ```python
-# src/igu/gitops/flux_config.py
+# src/guard/gitops/flux_config.py
 def update_istio_version(
     file_path: Path,
     new_version: str
@@ -250,7 +250,7 @@ def update_istio_version(
 
 ### Validation Engine
 
-**Location**: `src/igu/validation/engine.py`
+**Location**: `src/guard/validation/engine.py`
 
 Post-upgrade validation and monitoring.
 
@@ -264,7 +264,7 @@ Post-upgrade validation and monitoring.
 
 **Metrics Comparison**:
 ```python
-# src/igu/validation/metrics_comparator.py
+# src/guard/validation/metrics_comparator.py
 class MetricsComparator:
     def compare(
         self,
@@ -277,7 +277,7 @@ class MetricsComparator:
 
 ### Rollback Engine
 
-**Location**: `src/igu/rollback/engine.py`
+**Location**: `src/guard/rollback/engine.py`
 
 Automated rollback on validation failure.
 
@@ -289,7 +289,7 @@ Automated rollback on validation failure.
 
 ### State Management
 
-**Location**: `src/igu/registry/cluster_registry.py`
+**Location**: `src/guard/registry/cluster_registry.py`
 
 All state stored in DynamoDB for resumability.
 
@@ -403,7 +403,7 @@ mr_merged → upgrading → validating → upgraded
 ### Configuration Flow
 
 ```
-config.yaml → IguConfig → Components
+config.yaml → GuardConfig → Components
             ↓
      AWS Secrets Manager → Credentials
 ```
@@ -507,8 +507,8 @@ Flux CD → Apply to cluster
 Add custom checks by implementing:
 
 ```python
-# src/igu/checks/custom_check.py
-from igu.checks.base import HealthCheck
+# src/guard/checks/custom_check.py
+from guard.checks.base import HealthCheck
 
 class CustomHealthCheck(HealthCheck):
     async def run(self, cluster: Cluster) -> HealthCheckResult:
@@ -520,7 +520,7 @@ Register in configuration:
 
 ```yaml
 custom_checks:
-  - module: igu.checks.custom_check
+  - module: guard.checks.custom_check
     class: CustomHealthCheck
 ```
 
@@ -539,8 +539,8 @@ datadog:
 Implement notification handler:
 
 ```python
-# src/igu/notifications/custom_notifier.py
-from igu.notifications.base import Notifier
+# src/guard/notifications/custom_notifier.py
+from guard.notifications.base import Notifier
 
 class CustomNotifier(Notifier):
     async def send(self, message: str, severity: str) -> None:
@@ -553,8 +553,8 @@ class CustomNotifier(Notifier):
 Add custom LLM provider:
 
 ```python
-# src/igu/llm/providers/custom.py
-from igu.llm.base import LLMProvider
+# src/guard/llm/providers/custom.py
+from guard.llm.base import LLMProvider
 
 class CustomLLMProvider(LLMProvider):
     async def analyze(self, context: dict) -> str:

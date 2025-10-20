@@ -42,12 +42,14 @@ def cli(ctx: click.Context, config: str) -> None:
 @click.option("--dry-run", is_flag=True, help="Perform dry run without creating MR")
 @click.option("--max-concurrent", type=int, default=5, help="Max concurrent cluster operations")
 @click.pass_context
-def run(ctx: click.Context, batch: str, target_version: str, dry_run: bool, max_concurrent: int) -> None:
+def run(
+    ctx: click.Context, batch: str, target_version: str, dry_run: bool, max_concurrent: int
+) -> None:
     """Run pre-checks and create upgrade MR for a batch."""
     import asyncio
     from pathlib import Path
 
-    from guard.core.config import IguConfig
+    from guard.core.config import GuardConfig
     from guard.registry.cluster_registry import ClusterRegistry
     from guard.adapters.dynamodb_adapter import DynamoDBAdapter
     from guard.adapters.aws_adapter import AWSAdapter
@@ -161,9 +163,9 @@ def run(ctx: click.Context, batch: str, target_version: str, dry_run: bool, max_
     async def _run_upgrade():
         try:
             # Load configuration
-            config_path = Path(ctx.obj['config']).expanduser()
+            config_path = Path(ctx.obj["config"]).expanduser()
             console.print(f"Loading config from {config_path}...")
-            app_config = IguConfig.from_file(str(config_path))
+            app_config = GuardConfig.from_file(str(config_path))
 
             # Initialize cluster registry
             console.print("Initializing cluster registry...")
@@ -215,7 +217,11 @@ def run(ctx: click.Context, batch: str, target_version: str, dry_run: bool, max_
 
             # Summarize results
             console.print("\n[bold]Batch Processing Summary[/bold]")
-            success_count = sum(1 for r in results if isinstance(r, dict) and r.get("status") in ["success", "dry_run_success"])
+            success_count = sum(
+                1
+                for r in results
+                if isinstance(r, dict) and r.get("status") in ["success", "dry_run_success"]
+            )
             failed_count = len(results) - success_count
 
             console.print(f"  Total: {len(results)}")
@@ -233,6 +239,7 @@ def run(ctx: click.Context, batch: str, target_version: str, dry_run: bool, max_
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]")
             import traceback
+
             traceback.print_exc()
             logger.error("batch_processing_error", batch_id=batch, error=str(e))
             raise
@@ -250,7 +257,7 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
     from pathlib import Path
     from datetime import datetime, timedelta
 
-    from guard.core.config import IguConfig
+    from guard.core.config import GuardConfig
     from guard.registry.cluster_registry import ClusterRegistry
     from guard.adapters.dynamodb_adapter import DynamoDBAdapter
     from guard.adapters.datadog_adapter import DatadogAdapter
@@ -272,9 +279,9 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
     async def _monitor_batch():
         try:
             # Load configuration
-            config_path = Path(ctx.obj['config']).expanduser()
+            config_path = Path(ctx.obj["config"]).expanduser()
             console.print(f"Loading config from {config_path}...")
-            app_config = IguConfig.from_file(str(config_path))
+            app_config = GuardConfig.from_file(str(config_path))
 
             # Initialize cluster registry
             console.print("Initializing cluster registry...")
@@ -375,7 +382,8 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
 
                         failure_metrics = {
                             result.validator_name: result.violations
-                            for result in results if not result.passed
+                            for result in results
+                            if not result.passed
                         }
 
                         mr_url = await rollback_engine.create_rollback_mr(
@@ -387,7 +395,9 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
                         )
 
                         console.print(f"  [green]✓ Rollback MR created: {mr_url}[/green]")
-                        await registry.update_status(cluster.cluster_id, ClusterStatus.ROLLBACK_REQUIRED)
+                        await registry.update_status(
+                            cluster.cluster_id, ClusterStatus.ROLLBACK_REQUIRED
+                        )
                         logger.error(
                             "cluster_validation_failed_rollback_triggered",
                             cluster_id=cluster.cluster_id,
@@ -407,6 +417,7 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]")
             import traceback
+
             traceback.print_exc()
             logger.error("batch_monitoring_error", batch_id=batch, error=str(e))
             raise
@@ -423,7 +434,7 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
     import asyncio
     from pathlib import Path
 
-    from guard.core.config import IguConfig
+    from guard.core.config import GuardConfig
     from guard.registry.cluster_registry import ClusterRegistry
     from guard.adapters.dynamodb_adapter import DynamoDBAdapter
     from guard.rollback.engine import RollbackEngine
@@ -440,9 +451,9 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
     async def _rollback_batch():
         try:
             # Load configuration
-            config_path = Path(ctx.obj['config']).expanduser()
+            config_path = Path(ctx.obj["config"]).expanduser()
             console.print(f"Loading config from {config_path}...")
-            app_config = IguConfig.from_file(str(config_path))
+            app_config = GuardConfig.from_file(str(config_path))
 
             # Initialize cluster registry
             console.print("Initializing cluster registry...")
@@ -473,14 +484,17 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
                 try:
                     mr_url = await rollback_engine.create_rollback_mr(
                         cluster=cluster,
-                        current_version=cluster.target_istio_version or cluster.current_istio_version,
+                        current_version=cluster.target_istio_version
+                        or cluster.current_istio_version,
                         previous_version=cluster.current_istio_version,
                         failure_reason=f"Manual rollback: {reason}",
                         failure_metrics=None,
                     )
 
                     console.print(f"  [green]✓ Rollback MR created: {mr_url}[/green]\n")
-                    await registry.update_status(cluster.cluster_id, ClusterStatus.ROLLBACK_REQUIRED)
+                    await registry.update_status(
+                        cluster.cluster_id, ClusterStatus.ROLLBACK_REQUIRED
+                    )
                     logger.info(
                         "manual_rollback_triggered",
                         cluster_id=cluster.cluster_id,
@@ -501,6 +515,7 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]")
             import traceback
+
             traceback.print_exc()
             logger.error("batch_rollback_error", batch_id=batch, error=str(e))
             raise
@@ -522,7 +537,7 @@ def list_clusters(
     from pathlib import Path
     from rich.table import Table
 
-    from guard.core.config import IguConfig
+    from guard.core.config import GuardConfig
     from guard.registry.cluster_registry import ClusterRegistry
     from guard.adapters.dynamodb_adapter import DynamoDBAdapter
 
@@ -533,8 +548,8 @@ def list_clusters(
     async def _list_clusters():
         try:
             # Load configuration
-            config_path = Path(ctx.obj['config']).expanduser()
-            app_config = IguConfig.from_file(str(config_path))
+            config_path = Path(ctx.obj["config"]).expanduser()
+            app_config = GuardConfig.from_file(str(config_path))
 
             # Initialize cluster registry
             dynamodb = DynamoDBAdapter(region=app_config.aws.region)
@@ -583,6 +598,7 @@ def list_clusters(
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]")
             import traceback
+
             traceback.print_exc()
             raise
 
@@ -596,7 +612,7 @@ def validate(ctx: click.Context) -> None:
     import asyncio
     from pathlib import Path
 
-    from guard.core.config import IguConfig
+    from guard.core.config import GuardConfig
     from guard.adapters.dynamodb_adapter import DynamoDBAdapter
     from guard.adapters.datadog_adapter import DatadogAdapter
     from guard.adapters.gitlab_adapter import GitLabAdapter
@@ -607,7 +623,7 @@ def validate(ctx: click.Context) -> None:
     async def _validate():
         try:
             # Load configuration
-            config_path = Path(ctx.obj['config']).expanduser()
+            config_path = Path(ctx.obj["config"]).expanduser()
             console.print(f"[bold]1. Configuration File[/bold]")
             console.print(f"  Path: {config_path}")
 
@@ -618,7 +634,7 @@ def validate(ctx: click.Context) -> None:
             console.print(f"  [green]✓ Config file exists[/green]")
 
             try:
-                app_config = IguConfig.from_file(str(config_path))
+                app_config = GuardConfig.from_file(str(config_path))
                 console.print(f"  [green]✓ Config file valid[/green]\n")
             except Exception as e:
                 console.print(f"  [red]✗ Config file invalid: {e}[/red]\n")
@@ -669,6 +685,7 @@ def validate(ctx: click.Context) -> None:
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]")
             import traceback
+
             traceback.print_exc()
             raise
 

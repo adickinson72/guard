@@ -84,11 +84,34 @@ class CheckResult(BaseModel):
 
 
 class ValidationThresholds(BaseModel):
-    """Validation thresholds for metrics comparison."""
+    """Validation thresholds for metrics comparison.
 
-    latency_increase_percent: float = 10.0
-    error_rate_max: float = 0.001
-    resource_increase_percent: float = 50.0
+    Thresholds based on industry best practices for production Istio upgrades.
+    All percentage values represent maximum acceptable increases from baseline.
+    """
+
+    # Latency thresholds (percentage increase from baseline)
+    latency_p95_increase_percent: float = 10.0
+    latency_p99_increase_percent: float = 15.0
+
+    # Error rate thresholds
+    error_rate_max: float = 0.001  # 0.1% absolute maximum
+    error_rate_increase_max: float = 0.0005  # 0.05% relative increase from baseline
+
+    # Resource thresholds (percentage increase from baseline)
+    # Reduced from 50% to 25% based on consensus review
+    resource_increase_percent: float = 25.0
+
+    # Control plane specific thresholds
+    istiod_resource_increase_percent: float = 30.0
+    gateway_resource_increase_percent: float = 30.0
+
+    # Request volume gating (minimum requests for valid comparison)
+    min_request_volume: int = 1000
+
+    # Pilot/control plane error thresholds
+    pilot_xds_reject_threshold: int = 10  # Max rejected xDS pushes
+    pilot_push_error_rate_max: float = 0.01  # 1% max push error rate
 
 
 class FieldUpdate(BaseModel):

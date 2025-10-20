@@ -23,4 +23,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Example configurations
 - Setup scripts for DynamoDB
 
-[Unreleased]: https://github.com/your-org/igu/compare/HEAD...HEAD
+[Unreleased]: https://github.com/adickinson72/guard/compare/HEAD...HEAD

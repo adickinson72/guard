@@ -19,7 +19,7 @@ def sample_cluster_config() -> ClusterConfig:
         region="us-east-1",
         gitlab_repo="infra/k8s-clusters",
         flux_config_path="clusters/test/us-east-1/istio-helmrelease.yaml",
-        aws_role_arn="arn:aws:iam::123456789:role/IGU-EKSAccess-test",
+        aws_role_arn="arn:aws:iam::123456789:role/GUARD-EKSAccess-test",
         current_istio_version="1.19.3",
         target_istio_version="1.20.0",
         datadog_tags=DatadogTags(cluster="eks-test-us-east-1", service="istio-system", env="test"),
@@ -38,7 +38,7 @@ def sample_prod_cluster_config() -> ClusterConfig:
         region="us-east-1",
         gitlab_repo="infra/k8s-clusters",
         flux_config_path="clusters/prod/us-east-1/api/istio-helmrelease.yaml",
-        aws_role_arn="arn:aws:iam::123456789:role/IGU-EKSAccess-prod",
+        aws_role_arn="arn:aws:iam::123456789:role/GUARD-EKSAccess-prod",
         current_istio_version="1.19.3",
         target_istio_version="1.20.0",
         datadog_tags=DatadogTags(
@@ -53,7 +53,7 @@ def sample_prod_cluster_config() -> ClusterConfig:
 def mock_dynamodb_table() -> MagicMock:
     """Mock DynamoDB table for testing."""
     table = MagicMock()
-    table.table_name = "igu-cluster-registry"
+    table.table_name = "guard-cluster-registry"
     return table
 
 

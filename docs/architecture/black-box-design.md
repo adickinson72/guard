@@ -80,7 +80,7 @@ All external libraries are wrapped in adapters that implement clean interfaces.
 
 ### 3. Service Modules Contain All Service-Specific Code
 
-All Istio-specific code lives in `src/igu/services/istio/`:
+All Istio-specific code lives in `src/guard/services/istio/`:
 - Checks: `services/istio/checks/`
 - Validators: `services/istio/validators/`
 - Config updater: `gitops/updaters/istio_helm_updater.py`

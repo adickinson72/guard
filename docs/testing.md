@@ -102,13 +102,13 @@ pytest -m requires_datadog
 
 ```bash
 # Generate coverage report
-pytest --cov=igu --cov-report=html
+pytest --cov=guard --cov-report=html
 
 # View coverage report
 open htmlcov/index.html
 
 # Fail if coverage below threshold
-pytest --cov=igu --cov-fail-under=90
+pytest --cov=guard --cov-fail-under=90
 ```
 
 ### Specific Tests
@@ -169,8 +169,8 @@ def test_example():
 # tests/unit/test_cluster_registry.py
 import pytest
 from unittest.mock import Mock, patch
-from igu.registry.cluster_registry import ClusterRegistry
-from igu.core.models import Cluster
+from guard.registry.cluster_registry import ClusterRegistry
+from guard.core.models import Cluster
 
 def test_get_clusters_by_batch_returns_correct_clusters(mock_dynamodb_table):
     """Test that clusters are correctly filtered by batch_id."""
@@ -246,7 +246,7 @@ def test_update_cluster_status_updates_dynamodb(mock_dynamodb_table):
 ```python
 # tests/integration/test_datadog_integration.py
 import pytest
-from igu.clients.datadog_client import DatadogClient
+from guard.clients.datadog_client import DatadogClient
 
 @pytest.mark.requires_datadog
 @pytest.mark.slow
@@ -282,10 +282,10 @@ async def test_query_metrics_returns_valid_data(datadog_client, test_cluster):
 
 ```bash
 # Generate coverage report
-pytest --cov=igu --cov-report=term-missing
+pytest --cov=guard --cov-report=term-missing
 
 # HTML report for detailed view
-pytest --cov=igu --cov-report=html
+pytest --cov=guard --cov-report=html
 open htmlcov/index.html
 ```
 
@@ -294,13 +294,13 @@ open htmlcov/index.html
 ```
 Name                                      Stmts   Miss  Cover   Missing
 -----------------------------------------------------------------------
-src/igu/__init__.py                           2      0   100%
-src/igu/checks/pre_check_engine.py          145      8    95%   234-241
-src/igu/cli/main.py                          89     12    87%   45-52, 78-81
-src/igu/core/config.py                      219      5    98%   187-189
-src/igu/gitops/manager.py                   178     15    92%   123-128, 245-251
-src/igu/registry/cluster_registry.py        134      3    98%   89-91
-src/igu/validation/engine.py                156     18    88%   78-82, 156-167
+src/guard/__init__.py                           2      0   100%
+src/guard/checks/pre_check_engine.py          145      8    95%   234-241
+src/guard/cli/main.py                          89     12    87%   45-52, 78-81
+src/guard/core/config.py                      219      5    98%   187-189
+src/guard/gitops/manager.py                   178     15    92%   123-128, 245-251
+src/guard/registry/cluster_registry.py        134      3    98%   89-91
+src/guard/validation/engine.py                156     18    88%   78-82, 156-167
 -----------------------------------------------------------------------
 TOTAL                                      1456     89    94%
 ```
@@ -313,13 +313,13 @@ TOTAL                                      1456     89    94%
 # tests/conftest.py
 import pytest
 from unittest.mock import Mock
-from igu.core.config import IguConfig
-from igu.core.models import Cluster
+from guard.core.config import GuardConfig
+from guard.core.models import Cluster
 
 @pytest.fixture
 def test_config():
     """Provide test configuration."""
-    return IguConfig.from_file("tests/fixtures/config.yaml")
+    return GuardConfig.from_file("tests/fixtures/config.yaml")
 
 
 @pytest.fixture
@@ -392,7 +392,7 @@ Integration tests require access to external services:
 
 ```bash
 # Set environment variables
-export AWS_PROFILE=igu-test
+export AWS_PROFILE=guard-test
 export DATADOG_API_KEY=xxx
 export DATADOG_APP_KEY=xxx
 export GITLAB_TOKEN=xxx
@@ -435,7 +435,7 @@ pytest tests/integration/
 ```python
 # tests/e2e/test_full_workflow.py
 import pytest
-from igu.cli.main import main
+from guard.cli.main import main
 
 @pytest.mark.e2e
 @pytest.mark.slow
@@ -493,7 +493,7 @@ jobs:
           pip install poetry
           poetry install
       - name: Run unit tests
-        run: poetry run pytest tests/unit/ --cov=igu --cov-report=xml
+        run: poetry run pytest tests/unit/ --cov=guard --cov-report=xml
       - name: Upload coverage
         uses: codecov/codecov-action@v3
 
@@ -615,7 +615,7 @@ pip install pytest-asyncio
 ```bash
 # Solution: Ensure package is installed
 pip install -e .
-pytest --cov=igu --cov-report=term-missing
+pytest --cov=guard --cov-report=term-missing
 ```
 
 ## Additional Resources

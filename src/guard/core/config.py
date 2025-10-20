@@ -150,7 +150,7 @@ class LoggingConfig(BaseModel):
     output: str = "stdout"
 
 
-class IguConfig(BaseModel):
+class GuardConfig(BaseModel):
     """Main GUARD configuration."""
 
     aws: AWSConfig
@@ -166,14 +166,14 @@ class IguConfig(BaseModel):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
 
     @classmethod
-    def from_file(cls, path: str | Path) -> "IguConfig":
+    def from_file(cls, path: str | Path) -> "GuardConfig":
         """Load configuration from YAML file.
 
         Args:
             path: Path to configuration file
 
         Returns:
-            IguConfig instance
+            GuardConfig instance
 
         Raises:
             ConfigurationError: If file cannot be loaded or parsed

@@ -23,7 +23,7 @@ poetry run pre-commit install
 pytest
 
 # Run with coverage (90%+ required)
-pytest --cov=igu --cov-report=html
+pytest --cov=guard --cov-report=html
 
 # Run specific test types
 pytest tests/unit/              # Unit tests only
@@ -59,16 +59,16 @@ poetry run pre-commit run --all-files
 ### Building and Running
 ```bash
 # Build Docker image
-docker build -t igu:local .
+docker build -t guard:local .
 
 # Run CLI locally
-poetry run igu --help
-poetry run igu validate --config ~/.guard/config.yaml
-poetry run igu list --batch test
-poetry run igu run --batch test --target-version 1.20.0
+poetry run guard --help
+poetry run guard validate --config ~/.guard/config.yaml
+poetry run guard list --batch test
+poetry run guard run --batch test --target-version 1.20.0
 
 # Run in Kubernetes (after deploying)
-kubectl exec -n igu-system deploy/igu -- igu run --batch prod-wave-1 --target-version 1.20.0
+kubectl exec -n guard-system deploy/guard -- igu run --batch prod-wave-1 --target-version 1.20.0
 ```
 
 ### Kubernetes Deployment
@@ -77,17 +77,17 @@ kubectl exec -n igu-system deploy/igu -- igu run --batch prod-wave-1 --target-ve
 kubectl apply -k k8s/
 
 # View logs
-kubectl logs -n igu-system deploy/igu -f
+kubectl logs -n guard-system deploy/guard -f
 
 # Check all resources
-kubectl get all -n igu-system
+kubectl get all -n guard-system
 ```
 
 ## Architecture
 
 ### Source Code Structure
 ```
-src/igu/
+src/guard/
 ├── cli/              # Click-based CLI commands (run, monitor, rollback, list, validate)
 ├── clients/          # External service clients
 │   ├── aws_client.py       # AWS STS, EKS, Secrets Manager interactions
@@ -174,13 +174,13 @@ This project follows **Test-Driven Development (TDD)**:
 ## Configuration
 
 ### Required Credentials
-- **GitLab PAT**: Stored in AWS Secrets Manager as `igu/gitlab-token`
-- **Datadog API/App Keys**: Stored in AWS Secrets Manager as `igu/datadog-credentials`
+- **GitLab PAT**: Stored in AWS Secrets Manager as `guard/gitlab-token`
+- **Datadog API/App Keys**: Stored in AWS Secrets Manager as `guard/datadog-credentials`
 - **AWS IAM Roles**: Cross-account roles for EKS cluster access (defined per cluster in registry)
 
 ### Configuration Files
 - `~/.guard/config.yaml`: Main configuration (see `examples/config.yaml.example`)
-- DynamoDB table: `igu-cluster-registry` (created via `scripts/setup-dynamodb.sh`)
+- DynamoDB table: `guard-cluster-registry` (created via `scripts/setup-dynamodb.sh`)
 
 ### Kubernetes Deployment Configuration
 - `k8s/serviceaccount.yaml`: Pod Identity for cross-account AWS access
@@ -208,7 +208,7 @@ This project follows **Test-Driven Development (TDD)**:
 ### Formatting
 - Line length: 100 characters
 - Ruff for linting and formatting (Black-compatible)
-- Import order: stdlib → third-party → first-party (`igu`)
+- Import order: stdlib → third-party → first-party (`guard`)
 
 ## Important Implementation Details
 

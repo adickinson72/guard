@@ -4,7 +4,7 @@ This directory contains Kubernetes manifests for deploying GUARD inside an EKS c
 
 ## Files
 
-- **namespace.yaml**: Creates the `igu-system` namespace
+- **namespace.yaml**: Creates the `guard-system` namespace
 - **serviceaccount.yaml**: ServiceAccount with EKS Pod Identity annotation
 - **rbac.yaml**: ClusterRole and ClusterRoleBinding for GUARD permissions
 - **configmap.yaml**: ConfigMap for GUARD configuration (customize as needed)
@@ -47,15 +47,15 @@ eks.amazonaws.com/role-arn: arn:aws:iam::YOUR_ACCOUNT_ID:role/YOUR_ROLE_NAME
 Edit `deployment.yaml` and `cronjob.yaml`:
 
 ```yaml
-image: your-registry.com/igu:v1.0.0
+image: your-registry.com/guard:v1.0.0
 ```
 
 Or update `kustomization.yaml`:
 
 ```yaml
 images:
-- name: <YOUR_REGISTRY>/igu
-  newName: your-registry.com/igu
+- name: <YOUR_REGISTRY>/guard
+  newName: your-registry.com/guard
   newTag: v1.0.0
 ```
 
@@ -84,17 +84,17 @@ data:
 
 ```bash
 # Check all resources
-kubectl get all -n igu-system
+kubectl get all -n guard-system
 
 # Check service account
-kubectl get sa -n igu-system igu -o yaml
+kubectl get sa -n guard-system guard -o yaml
 
 # Check RBAC
-kubectl get clusterrole igu-manager
-kubectl get clusterrolebinding igu-manager-binding
+kubectl get clusterrole guard-manager
+kubectl get clusterrolebinding guard-manager-binding
 
 # View logs
-kubectl logs -n igu-system deploy/igu
+kubectl logs -n guard-system deploy/guard
 ```
 
 ## Documentation

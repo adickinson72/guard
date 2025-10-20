@@ -8,7 +8,7 @@ from guard.core.exceptions import (
     ConfigurationError,
     DatadogError,
     GitOpsError,
-    IguError,
+    GuardError,
     IstioError,
     KubernetesError,
     LockAcquisitionError,
@@ -21,8 +21,8 @@ from guard.core.exceptions import (
 class TestExceptionHierarchy:
     """Tests for exception hierarchy and inheritance."""
 
-    def test_all_exceptions_inherit_from_igu_error(self) -> None:
-        """Test that all custom exceptions inherit from IguError."""
+    def test_all_exceptions_inherit_from_guard_error(self) -> None:
+        """Test that all custom exceptions inherit from GuardError."""
         exceptions = [
             ConfigurationError,
             PreCheckFailedError,
@@ -38,18 +38,18 @@ class TestExceptionHierarchy:
         ]
 
         for exc_class in exceptions:
-            assert issubclass(exc_class, IguError)
+            assert issubclass(exc_class, GuardError)
 
-    def test_igu_error_inherits_from_exception(self) -> None:
-        """Test that IguError inherits from Exception."""
-        assert issubclass(IguError, Exception)
+    def test_guard_error_inherits_from_exception(self) -> None:
+        """Test that GuardError inherits from Exception."""
+        assert issubclass(GuardError, Exception)
 
     def test_can_catch_with_base_exception(self) -> None:
-        """Test that specific exceptions can be caught with IguError."""
-        with pytest.raises(IguError):
+        """Test that specific exceptions can be caught with GuardError."""
+        with pytest.raises(GuardError):
             raise ConfigurationError("Test error")
 
-        with pytest.raises(IguError):
+        with pytest.raises(GuardError):
             raise ValidationFailedError("Test error")
 
     def test_exception_messages(self) -> None:

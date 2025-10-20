@@ -227,7 +227,7 @@ igu validate --config <config-file> \
 **Implementation:**
 
 ```python
-# src/igu/registry/cluster_registry.py
+# src/guard/registry/cluster_registry.py
 from typing import List, Optional
 from dataclasses import dataclass
 import boto3
@@ -382,7 +382,7 @@ batch_order:
 **Components:**
 
 ```python
-# src/igu/checks/pre_check_engine.py
+# src/guard/checks/pre_check_engine.py
 from abc import ABC, abstractmethod
 from typing import Dict, List
 
@@ -483,7 +483,7 @@ class PreCheckEngine:
 **Purpose:** Handle Git/GitLab operations
 
 ```python
-# src/igu/gitops/manager.py
+# src/guard/gitops/manager.py
 from typing import Optional
 import gitlab
 from git import Repo
@@ -561,7 +561,7 @@ class GitOpsManager:
 **Purpose:** Post-upgrade validation and monitoring
 
 ```python
-# src/igu/validation/engine.py
+# src/guard/validation/engine.py
 import time
 from typing import Tuple, List
 
@@ -660,7 +660,7 @@ class ValidationEngine:
 **Purpose:** Automated rollback on validation failure
 
 ```python
-# src/igu/rollback/engine.py
+# src/guard/rollback/engine.py
 
 class RollbackEngine:
     def __init__(self, gitops_manager: GitOpsManager):
@@ -695,7 +695,7 @@ class RollbackEngine:
 
 **AWS Client:**
 ```python
-# src/igu/clients/aws_client.py
+# src/guard/clients/aws_client.py
 import boto3
 from botocore.exceptions import ClientError
 
@@ -773,7 +773,7 @@ class AWSClient:
 
 **Datadog Client:**
 ```python
-# src/igu/clients/datadog_client.py
+# src/guard/clients/datadog_client.py
 from datadog_api_client import ApiClient, Configuration
 from datadog_api_client.v1.api.metrics_api import MetricsApi
 from datadog_api_client.v1.api.monitors_api import MonitorsApi
@@ -809,7 +809,7 @@ class DatadogClient:
 
 **Istioctl Wrapper:**
 ```python
-# src/igu/clients/istioctl.py
+# src/guard/clients/istioctl.py
 import subprocess
 import json
 
@@ -850,7 +850,7 @@ class IstioctlWrapper:
 1. **DynamoDB Table Creation:**
    ```bash
    aws dynamodb create-table \
-       --table-name igu-cluster-registry \
+       --table-name guard-cluster-registry \
        --attribute-definitions \
            AttributeName=cluster_id,AttributeType=S \
            AttributeName=batch_id,AttributeType=S \
@@ -869,12 +869,12 @@ class IstioctlWrapper:
    ```bash
    # Store GitLab token
    aws secretsmanager create-secret \
-       --name igu/gitlab-token \
+       --name guard/gitlab-token \
        --secret-string "glpat-xxxxxxxxxxxx"
 
    # Store Datadog credentials
    aws secretsmanager create-secret \
-       --name igu/datadog-credentials \
+       --name guard/datadog-credentials \
        --secret-string '{"api_key":"xxx","app_key":"xxx"}'
    ```
 
@@ -1117,11 +1117,11 @@ aws:
   region: us-east-1
   profile: default  # Optional: AWS profile to use
   dynamodb:
-    table_name: igu-cluster-registry
+    table_name: guard-cluster-registry
     region: us-east-1
   secrets_manager:
-    gitlab_token_secret: igu/gitlab-token
-    datadog_credentials_secret: igu/datadog-credentials
+    gitlab_token_secret: guard/gitlab-token
+    datadog_credentials_secret: guard/datadog-credentials
 
 # GitLab Settings
 gitlab:
@@ -1364,7 +1364,7 @@ igu monitor --batch prod-wave-1
         "dynamodb:Query",
         "dynamodb:Scan"
       ],
-      "Resource": "arn:aws:dynamodb:*:*:table/igu-cluster-registry"
+      "Resource": "arn:aws:dynamodb:*:*:table/guard-cluster-registry"
     },
     {
       "Effect": "Allow",
@@ -1431,24 +1431,24 @@ igu monitor --batch prod-wave-1
 **Metrics to track:**
 
 ```python
-# src/igu/utils/metrics.py
+# src/guard/utils/metrics.py
 from datadog import statsd
 
 # Upgrade execution metrics
-statsd.increment('igu.upgrade.started', tags=['batch:prod-wave-1'])
-statsd.increment('igu.upgrade.success', tags=['batch:prod-wave-1'])
-statsd.increment('igu.upgrade.failed', tags=['batch:prod-wave-1'])
+statsd.increment('guard.upgrade.started', tags=['batch:prod-wave-1'])
+statsd.increment('guard.upgrade.success', tags=['batch:prod-wave-1'])
+statsd.increment('guard.upgrade.failed', tags=['batch:prod-wave-1'])
 
 # Pre-check metrics
 statsd.histogram('igu.precheck.duration', 45.2, tags=['cluster:eks-prod'])
 statsd.increment('igu.precheck.failed', tags=['check:datadog_alerts'])
 
 # Validation metrics
-statsd.histogram('igu.validation.soak_period', 3600)
-statsd.gauge('igu.validation.latency_increase', 5.2, tags=['cluster:eks-prod'])
+statsd.histogram('guard.validation.soak_period', 3600)
+statsd.gauge('guard.validation.latency_increase', 5.2, tags=['cluster:eks-prod'])
 
 # Rollback metrics
-statsd.increment('igu.rollback.triggered', tags=['batch:prod-wave-1'])
+statsd.increment('guard.rollback.triggered', tags=['batch:prod-wave-1'])
 ```
 
 **Custom Datadog Dashboard:**
@@ -1632,10 +1632,10 @@ Apache 2.0 - see [LICENSE](LICENSE)
 
 ## Support & Resources
 
-- **Documentation:** https://github.com/your-org/igu/docs
-- **Issues:** https://github.com/your-org/igu/issues
-- **Discussions:** https://github.com/your-org/igu/discussions
-- **Slack:** #igu-support
+- **Documentation:** https://github.com/adickinson72/guard/docs
+- **Issues:** https://github.com/adickinson72/guard/issues
+- **Discussions:** https://github.com/adickinson72/guard/discussions
+- **Slack:** #guard-support
 
 ---
 

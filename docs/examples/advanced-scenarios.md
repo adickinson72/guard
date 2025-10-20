@@ -60,24 +60,24 @@ TARGET_VERSION="1.20.0"
 
 # Region 1: US East (Primary)
 echo "=== US East Region ==="
-igu run --batch us-east-prod-wave-1 --target-version $TARGET_VERSION
+guard run --batch us-east-prod-wave-1 --target-version $TARGET_VERSION
 echo "Review and merge MR, then press Enter..."
 read
-igu monitor --batch us-east-prod-wave-1 --soak-period 120
+guard monitor --batch us-east-prod-wave-1 --soak-period 120
 
 # Region 2: US West (wait for US East)
 echo "=== US West Region ==="
-igu run --batch us-west-prod-wave-1 --target-version $TARGET_VERSION
+guard run --batch us-west-prod-wave-1 --target-version $TARGET_VERSION
 echo "Review and merge MR, then press Enter..."
 read
-igu monitor --batch us-west-prod-wave-1 --soak-period 120
+guard monitor --batch us-west-prod-wave-1 --soak-period 120
 
 # Region 3: EU (wait for both US regions)
 echo "=== EU Region ==="
-igu run --batch eu-prod-wave-1 --target-version $TARGET_VERSION
+guard run --batch eu-prod-wave-1 --target-version $TARGET_VERSION
 echo "Review and merge MR, then press Enter..."
 read
-igu monitor --batch eu-prod-wave-1 --soak-period 120
+guard monitor --batch eu-prod-wave-1 --soak-period 120
 
 echo "✓ Multi-region upgrade complete!"
 ```
@@ -104,17 +104,17 @@ batches:
 
 ```bash
 # 1. Upgrade canary first
-igu run --batch prod-canary --target-version 1.20.0
-igu monitor --batch prod-canary --soak-period 240  # Long soak (4 hours)
+guard run --batch prod-canary --target-version 1.20.0
+guard monitor --batch prod-canary --soak-period 240  # Long soak (4 hours)
 
 # 2. If canary successful, upgrade main
 if [ $? -eq 0 ]; then
     echo "Canary successful, proceeding with main clusters"
-    igu run --batch prod-main --target-version 1.20.0
-    igu monitor --batch prod-main --soak-period 120
+    guard run --batch prod-main --target-version 1.20.0
+    guard monitor --batch prod-main --soak-period 120
 else
     echo "Canary failed, aborting main cluster upgrade"
-    igu rollback --batch prod-canary
+    guard rollback --batch prod-canary
     exit 1
 fi
 ```
@@ -139,8 +139,8 @@ aws secretsmanager create-secret \
     --secret-string "sk-xxxxxxxxxxxxx"
 
 # Run upgrade with LLM analysis on failure
-igu run --batch prod-wave-1 --target-version 1.20.0
-igu monitor --batch prod-wave-1 --enable-llm-analysis
+guard run --batch prod-wave-1 --target-version 1.20.0
+guard monitor --batch prod-wave-1 --enable-llm-analysis
 
 # If validation fails, GUARD will:
 # 1. Collect failure data (metrics, logs, events)
@@ -189,8 +189,8 @@ Add custom health checks:
 
 ```python
 # custom_checks.py
-from igu.checks.base import HealthCheck
-from igu.core.models import HealthCheckResult, CheckStatus, Cluster
+from guard.checks.base import HealthCheck
+from guard.core.models import HealthCheckResult, CheckStatus, Cluster
 
 class CustomDatabaseCheck(HealthCheck):
     """Check database connectivity from cluster."""
@@ -326,10 +326,10 @@ TARGET_VERSION="1.20.0"
 run_batch() {
     local batch=$1
     echo "=== Upgrading batch: $batch ==="
-    igu run --batch $batch --target-version $TARGET_VERSION
+    guard run --batch $batch --target-version $TARGET_VERSION
     echo "Review and merge MR for $batch, then press Enter..."
     read
-    igu monitor --batch $batch
+    guard monitor --batch $batch
 
     if [ $? -ne 0 ]; then
         echo "ERROR: Batch $batch failed validation"
@@ -371,7 +371,7 @@ execution:
 # 4. Traffic shift gradual
 
 # Example validation
-igu run --batch prod-wave-1 --target-version 1.20.0 \
+guard run --batch prod-wave-1 --target-version 1.20.0 \
     --ensure-pdb \
     --min-replicas 3 \
     --max-unavailable 1
@@ -394,8 +394,8 @@ upgrade-test:
   stage: upgrade
   script:
     - pip install igu
-    - igu run --batch test --target-version $GUARD_VERSION
-    - igu monitor --batch test
+    - guard run --batch test --target-version $GUARD_VERSION
+    - guard monitor --batch test
   only:
     - schedules
   environment:
@@ -405,7 +405,7 @@ upgrade-prod:
   stage: upgrade
   script:
     - pip install igu
-    - igu run --batch prod-wave-1 --target-version $GUARD_VERSION
+    - guard run --batch prod-wave-1 --target-version $GUARD_VERSION
     # Wait for manual MR merge
   when: manual
   only:
@@ -417,7 +417,7 @@ validate-prod:
   stage: validate
   script:
     - pip install igu
-    - igu monitor --batch prod-wave-1 --soak-period 120
+    - guard monitor --batch prod-wave-1 --soak-period 120
   needs: [upgrade-prod]
   environment:
     name: production
@@ -463,7 +463,7 @@ jobs:
 
       - name: Run pre-checks and create MR
         run: |
-          igu run --batch ${{ inputs.batch }} \
+          guard run --batch ${{ inputs.batch }} \
                   --target-version ${{ inputs.target_version }}
 
       - name: Wait for MR merge
@@ -493,7 +493,7 @@ jobs:
 
       - name: Monitor and validate
         run: |
-          igu monitor --batch ${{ inputs.batch }} --soak-period 120
+          guard monitor --batch ${{ inputs.batch }} --soak-period 120
 
       - name: Notify on failure
         if: failure()
@@ -515,7 +515,7 @@ Manage upgrades for multiple teams/tenants:
 aws:
   region: us-east-1
   dynamodb:
-    table_name: igu-cluster-registry
+    table_name: guard-cluster-registry
   secrets_manager:
     gitlab_token_secret: igu/team-a/gitlab-token
     datadog_credentials_secret: igu/team-a/datadog-credentials
@@ -530,12 +530,12 @@ batches:
 
 ```bash
 # Team A upgrade
-igu run --config ~/.guard/team-a-config.yaml \
+guard run --config ~/.guard/team-a-config.yaml \
     --batch team-a-prod \
     --target-version 1.20.0
 
 # Team B upgrade (separate config)
-igu run --config ~/.guard/team-b-config.yaml \
+guard run --config ~/.guard/team-b-config.yaml \
     --batch team-b-prod \
     --target-version 1.20.0
 ```
@@ -548,13 +548,13 @@ Upgrade multiple independent batches in parallel:
 #!/bin/bash
 
 # Upgrade dev batches in parallel (they're independent)
-igu run --batch dev-us-east --target-version 1.20.0 &
+guard run --batch dev-us-east --target-version 1.20.0 &
 PID1=$!
 
-igu run --batch dev-us-west --target-version 1.20.0 &
+guard run --batch dev-us-west --target-version 1.20.0 &
 PID2=$!
 
-igu run --batch dev-eu --target-version 1.20.0 &
+guard run --batch dev-eu --target-version 1.20.0 &
 PID3=$!
 
 # Wait for all to complete

@@ -16,6 +16,6 @@ commonLabels:
   app.kubernetes.io/managed-by: kustomize
 
 images:
-- name: <YOUR_REGISTRY>/igu
-  newName: <YOUR_REGISTRY>/igu
+- name: <YOUR_REGISTRY>/guard
+  newName: <YOUR_REGISTRY>/guard
   newTag: latest

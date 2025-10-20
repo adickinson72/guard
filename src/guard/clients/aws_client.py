@@ -151,13 +151,13 @@ class AWSClient:
             # Create a presigned URL for STS GetCallerIdentity
             # with the cluster name as a header
             request_params = {
-                'method': 'GET',
-                'url': f'https://sts.{self.region}.amazonaws.com/',
-                'body': {},
-                'headers': {
-                    'x-k8s-aws-id': cluster_name,
+                "method": "GET",
+                "url": f"https://sts.{self.region}.amazonaws.com/",
+                "body": {},
+                "headers": {
+                    "x-k8s-aws-id": cluster_name,
                 },
-                'context': {},
+                "context": {},
             }
 
             # Get credentials from the session
@@ -166,10 +166,10 @@ class AWSClient:
 
             # Create a request signer
             signer = RequestSigner(
-                ServiceId('sts'),
+                ServiceId("sts"),
                 self.region,
-                'sts',
-                'v4',
+                "sts",
+                "v4",
                 frozen_credentials,
                 self.session.events,
             )
@@ -181,14 +181,14 @@ class AWSClient:
             presigned_url = signer.generate_presigned_url(
                 request_params,
                 region_name=self.region,
-                operation_name='GetCallerIdentity',
+                operation_name="GetCallerIdentity",
                 expires_in=60,
             )
 
             # Encode the URL as base64 and prefix with k8s-aws-v1.
             # This is the EKS authentication token format
-            token_bytes = presigned_url.encode('utf-8')
-            token_b64 = base64.urlsafe_b64encode(token_bytes).decode('utf-8').rstrip('=')
+            token_bytes = presigned_url.encode("utf-8")
+            token_b64 = base64.urlsafe_b64encode(token_bytes).decode("utf-8").rstrip("=")
             token = f"k8s-aws-v1.{token_b64}"
 
             logger.info("kubeconfig_token_generated", cluster_name=cluster_name)
@@ -202,7 +202,9 @@ class AWSClient:
             }
 
         except Exception as e:
-            logger.error("kubeconfig_token_generation_failed", cluster_name=cluster_name, error=str(e))
+            logger.error(
+                "kubeconfig_token_generation_failed", cluster_name=cluster_name, error=str(e)
+            )
             raise AWSError(f"Failed to generate kubeconfig token for {cluster_name}: {e}") from e
 
     @rate_limited("aws_api")

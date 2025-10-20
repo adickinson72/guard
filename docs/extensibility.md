@@ -6,7 +6,7 @@ This document explains how GUARD (GitOps Upgrade Automation with Rollback Detect
 
 - [Overview](#overview)
 - [Architecture for Extensibility](#architecture-for-extensibility)
-- [Extending GUARD for Other Services](#extending-igu-for-other-services)
+- [Extending GUARD for Other Services](#extending-guard-for-other-services)
 - [Application-Specific Validation](#application-specific-validation)
 - [Immediate Extension Candidates](#immediate-extension-candidates)
 - [Implementation Roadmap](#implementation-roadmap)
@@ -79,7 +79,7 @@ GUARD's core design is fundamentally service-agnostic. While it was originally b
 The core abstraction is a `ServiceProvider` interface that encapsulates service-specific behavior:
 
 ```python
-# src/igu/providers/base.py
+# src/guard/providers/base.py
 from abc import ABC, abstractmethod
 from typing import Any
 
@@ -148,9 +148,9 @@ class ServiceProvider(ABC):
 Implement the `ServiceProvider` interface for your target service:
 
 ```python
-# src/igu/providers/promtail.py
-from igu.providers.base import ServiceProvider
-from igu.core.models import Cluster, HealthCheckResult, ValidationResult
+# src/guard/providers/promtail.py
+from guard.providers.base import ServiceProvider
+from guard.core.models import Cluster, HealthCheckResult, ValidationResult
 
 class PromtailProvider(ServiceProvider):
     """Service provider for Promtail/Loki upgrades."""
@@ -246,7 +246,7 @@ Add provider registration to configuration:
 # config.yaml
 service_provider:
   type: promtail  # or 'istio', 'datadog-agent', etc.
-  module: igu.providers.promtail
+  module: guard.providers.promtail
   class: PromtailProvider
 
 # Service-specific configuration
@@ -264,12 +264,12 @@ promtail:
 Modify the core engine to use the service provider:
 
 ```python
-# src/igu/core/engine.py
-from igu.providers.base import ServiceProvider
-from igu.providers.factory import ServiceProviderFactory
+# src/guard/core/engine.py
+from guard.providers.base import ServiceProvider
+from guard.providers.factory import ServiceProviderFactory
 
 class UpgradeEngine:
-    def __init__(self, config: IguConfig):
+    def __init__(self, config: GuardConfig):
         self.config = config
         # Load service provider dynamically
         self.provider: ServiceProvider = ServiceProviderFactory.create(
@@ -483,9 +483,9 @@ Tasks:
 7. Update tests to work with provider abstraction
 
 **Deliverables**:
-- `src/igu/providers/base.py` - Abstract interface
-- `src/igu/providers/istio.py` - Istio implementation
-- `src/igu/providers/factory.py` - Provider factory
+- `src/guard/providers/base.py` - Abstract interface
+- `src/guard/providers/istio.py` - Istio implementation
+- `src/guard/providers/factory.py` - Provider factory
 - Updated configuration schema
 - Comprehensive tests
 
@@ -501,7 +501,7 @@ Tasks:
 5. Document usage
 
 **Deliverables**:
-- `src/igu/providers/promtail.py`
+- `src/guard/providers/promtail.py`
 - `examples/promtail-config.yaml`
 - `docs/providers/promtail.md`
 - Integration tests
@@ -519,7 +519,7 @@ Tasks:
 5. Document special considerations
 
 **Deliverables**:
-- `src/igu/providers/datadog_agent.py`
+- `src/guard/providers/datadog_agent.py`
 - `examples/datadog-agent-config.yaml`
 - `docs/providers/datadog-agent.md`
 - Tests and documentation
@@ -538,12 +538,12 @@ Tasks:
 7. Common test fixtures
 
 **Deliverables**:
-- `src/igu/validation/kubectl_validator.py`
-- `src/igu/validation/metrics_comparator.py` (enhanced)
-- `src/igu/validation/log_analyzer.py`
-- `src/igu/validation/dns_validator.py`
-- `src/igu/validation/cert_validator.py`
-- `src/igu/validation/http_health_checker.py`
+- `src/guard/validation/kubectl_validator.py`
+- `src/guard/validation/metrics_comparator.py` (enhanced)
+- `src/guard/validation/log_analyzer.py`
+- `src/guard/validation/dns_validator.py`
+- `src/guard/validation/cert_validator.py`
+- `src/guard/validation/http_health_checker.py`
 
 ### Phase 5: Documentation & Examples (1 week)
 
@@ -586,13 +586,13 @@ Here's a complete example of extending GUARD for Promtail/Loki upgrades.
 ### 1. Provider Implementation
 
 ```python
-# src/igu/providers/promtail.py
+# src/guard/providers/promtail.py
 from pathlib import Path
 from typing import Any
 import yaml
-from igu.providers.base import ServiceProvider
-from igu.core.models import Cluster, HealthCheckResult, ValidationResult, CheckStatus
-from igu.clients.kubernetes import KubernetesClient
+from guard.providers.base import ServiceProvider
+from guard.core.models import Cluster, HealthCheckResult, ValidationResult, CheckStatus
+from guard.clients.kubernetes import KubernetesClient
 
 class PromtailProvider(ServiceProvider):
     """Service provider for Promtail/Loki log aggregation upgrades."""
@@ -806,7 +806,7 @@ class PromtailProvider(ServiceProvider):
 # Service provider configuration
 service_provider:
   type: promtail
-  module: igu.providers.promtail
+  module: guard.providers.promtail
   class: PromtailProvider
 
 # Promtail-specific settings
@@ -823,18 +823,18 @@ promtail:
 
 # Datadog configuration (for metrics)
 datadog:
-  api_key_secret: igu/datadog-credentials
-  app_key_secret: igu/datadog-credentials
+  api_key_secret: guard/datadog-credentials
+  app_key_secret: guard/datadog-credentials
 
 # GitLab configuration
 gitlab:
   url: https://gitlab.company.com
-  token_secret: igu/gitlab-token
+  token_secret: guard/gitlab-token
   project_id: 12345
 
 # Cluster registry
 registry:
-  dynamodb_table: igu-clusters
+  dynamodb_table: guard-clusters
   region: us-east-1
 
 # Batch definitions
@@ -853,25 +853,25 @@ batches:
 
 ```bash
 # Validate configuration
-igu validate --config ~/.guard/promtail-config.yaml
+guard validate --config ~/.guard/promtail-config.yaml
 
 # List clusters in batch
-igu list --batch prod-wave-1 --config ~/.guard/promtail-config.yaml
+guard list --batch prod-wave-1 --config ~/.guard/promtail-config.yaml
 
 # Run pre-checks and create upgrade MR
-igu run \
+guard run \
   --batch prod-wave-1 \
   --target-version 6.16.0 \
   --config ~/.guard/promtail-config.yaml
 
 # After MR is merged, monitor and validate
-igu monitor \
+guard monitor \
   --batch prod-wave-1 \
   --soak-period 30 \
   --config ~/.guard/promtail-config.yaml
 
 # Rollback if needed
-igu rollback \
+guard rollback \
   --batch prod-wave-1 \
   --config ~/.guard/promtail-config.yaml
 ```

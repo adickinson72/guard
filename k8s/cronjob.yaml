@@ -48,7 +48,7 @@ spec:
             - "--target-version"
             - "1.20.0"
             env:
-            - name: IGU_CONFIG_PATH
+            - name: GUARD_CONFIG_PATH
               value: /app/config/config.yaml
             - name: AWS_REGION
               value: us-east-1

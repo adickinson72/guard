@@ -29,10 +29,10 @@ pip install igu
 Load and manage GUARD configuration.
 
 ```python
-from igu.core.config import IguConfig
+from guard.core.config import GuardConfig
 
 # Load from file
-config = IguConfig.from_file("~/.guard/config.yaml")
+config = GuardConfig.from_file("~/.guard/config.yaml")
 
 # Access configuration
 print(config.aws.region)
@@ -44,10 +44,10 @@ batch = config.get_batch("prod-wave-1")
 print(batch.clusters)
 ```
 
-**Class**: `IguConfig`
+**Class**: `GuardConfig`
 
 **Methods**:
-- `from_file(path: str | Path) -> IguConfig` - Load configuration from YAML file
+- `from_file(path: str | Path) -> GuardConfig` - Load configuration from YAML file
 - `get_batch(batch_name: str) -> BatchConfig | None` - Get batch configuration by name
 - `to_dict() -> dict[str, Any]` - Convert to dictionary
 
@@ -66,10 +66,10 @@ print(batch.clusters)
 Query and manage cluster metadata.
 
 ```python
-from igu.registry.cluster_registry import ClusterRegistry
+from guard.registry.cluster_registry import ClusterRegistry
 
 # Initialize
-registry = ClusterRegistry(table_name="igu-cluster-registry")
+registry = ClusterRegistry(table_name="guard-cluster-registry")
 
 # Get all clusters in a batch
 clusters = registry.get_clusters_by_batch("prod-wave-1")
@@ -103,11 +103,11 @@ registry.update_cluster_version("eks-prod-us-east-1-api", "1.20.0")
 Run health checks before upgrades.
 
 ```python
-from igu.checks.pre_check_engine import PreCheckEngine
-from igu.core.config import IguConfig
+from guard.checks.pre_check_engine import PreCheckEngine
+from guard.core.config import GuardConfig
 
 # Initialize
-config = IguConfig.from_file("~/.guard/config.yaml")
+config = GuardConfig.from_file("~/.guard/config.yaml")
 engine = PreCheckEngine(config=config)
 
 # Run pre-checks for clusters
@@ -125,7 +125,7 @@ for cluster_id, checks in results.items():
 **Class**: `PreCheckEngine`
 
 **Methods**:
-- `__init__(config: IguConfig) -> None`
+- `__init__(config: GuardConfig) -> None`
 - `async run_pre_checks(clusters: list[Cluster]) -> dict[str, list[HealthCheckResult]]`
 - `async check_kubernetes_health(cluster: Cluster) -> HealthCheckResult`
 - `async check_istio_health(cluster: Cluster) -> HealthCheckResult`
@@ -137,11 +137,11 @@ for cluster_id, checks in results.items():
 Validate upgrades and compare metrics.
 
 ```python
-from igu.validation.engine import ValidationEngine
-from igu.core.config import IguConfig
+from guard.validation.engine import ValidationEngine
+from guard.core.config import GuardConfig
 
 # Initialize
-config = IguConfig.from_file("~/.guard/config.yaml")
+config = GuardConfig.from_file("~/.guard/config.yaml")
 engine = ValidationEngine(config=config)
 
 # Run validation
@@ -164,7 +164,7 @@ else:
 **Class**: `ValidationEngine`
 
 **Methods**:
-- `__init__(config: IguConfig) -> None`
+- `__init__(config: GuardConfig) -> None`
 - `async validate_upgrade(cluster: Cluster, baseline_metrics: dict, soak_period_minutes: int) -> ValidationResult`
 - `async wait_for_flux_sync(cluster: Cluster, timeout_minutes: int) -> bool`
 - `async monitor_rollout(cluster: Cluster) -> bool`
@@ -175,11 +175,11 @@ else:
 Create and manage GitLab merge requests.
 
 ```python
-from igu.gitops.manager import GitOpsManager
-from igu.core.config import IguConfig
+from guard.gitops.manager import GitOpsManager
+from guard.core.config import GuardConfig
 
 # Initialize
-config = IguConfig.from_file("~/.guard/config.yaml")
+config = GuardConfig.from_file("~/.guard/config.yaml")
 manager = GitOpsManager(config=config)
 
 # Create upgrade MR
@@ -198,7 +198,7 @@ print(f"MR created: {mr['web_url']}")
 **Class**: `GitOpsManager`
 
 **Methods**:
-- `__init__(config: IguConfig) -> None`
+- `__init__(config: GuardConfig) -> None`
 - `async create_upgrade_mr(clusters: list[Cluster], target_version: str, health_report: str) -> dict`
 - `async create_rollback_mr(cluster: Cluster, previous_version: str) -> dict`
 - `async update_flux_config(cluster: Cluster, new_version: str) -> None`
@@ -208,11 +208,11 @@ print(f"MR created: {mr['web_url']}")
 Handle automated rollbacks.
 
 ```python
-from igu.rollback.engine import RollbackEngine
-from igu.core.config import IguConfig
+from guard.rollback.engine import RollbackEngine
+from guard.core.config import GuardConfig
 
 # Initialize
-config = IguConfig.from_file("~/.guard/config.yaml")
+config = GuardConfig.from_file("~/.guard/config.yaml")
 engine = RollbackEngine(config=config)
 
 # Trigger rollback
@@ -229,7 +229,7 @@ print(f"Rollback MR: {result['mr_url']}")
 **Class**: `RollbackEngine`
 
 **Methods**:
-- `__init__(config: IguConfig) -> None`
+- `__init__(config: GuardConfig) -> None`
 - `async rollback(cluster: Cluster, previous_version: str, failure_reason: str) -> dict`
 - `async analyze_failure(cluster: Cluster, validation_result: ValidationResult) -> str` (if LLM enabled)
 
@@ -238,7 +238,7 @@ print(f"Rollback MR: {result['mr_url']}")
 ### AWS Client
 
 ```python
-from igu.clients.aws_client import AWSClient
+from guard.clients.aws_client import AWSClient
 
 client = AWSClient(region="us-east-1")
 
@@ -249,7 +249,7 @@ credentials = await client.assume_role(
 )
 
 # Get secret
-secret = await client.get_secret("igu/gitlab-token")
+secret = await client.get_secret("guard/gitlab-token")
 ```
 
 **Methods**:
@@ -260,7 +260,7 @@ secret = await client.get_secret("igu/gitlab-token")
 ### Kubernetes Client
 
 ```python
-from igu.clients.kubernetes_client import KubernetesClient
+from guard.clients.kubernetes_client import KubernetesClient
 
 client = KubernetesClient(cluster_name="eks-prod-us-east-1-api")
 
@@ -284,7 +284,7 @@ ready = await client.is_deployment_ready(
 ### Datadog Client
 
 ```python
-from igu.clients.datadog_client import DatadogClient
+from guard.clients.datadog_client import DatadogClient
 
 client = DatadogClient(
     api_key="xxx",
@@ -310,7 +310,7 @@ alerts = await client.get_active_monitors(tags=["cluster:eks-prod"])
 ### GitLab Client
 
 ```python
-from igu.clients.gitlab_client import GitLabClient
+from guard.clients.gitlab_client import GitLabClient
 
 client = GitLabClient(
     url="https://gitlab.company.com",
@@ -337,7 +337,7 @@ mr = await client.create_merge_request(
 ### Cluster
 
 ```python
-from igu.core.models import Cluster
+from guard.core.models import Cluster
 
 cluster = Cluster(
     cluster_id="eks-prod-us-east-1-api",
@@ -372,7 +372,7 @@ cluster = Cluster(
 ### HealthCheckResult
 
 ```python
-from igu.core.models import HealthCheckResult, CheckStatus
+from guard.core.models import HealthCheckResult, CheckStatus
 
 result = HealthCheckResult(
     cluster_id="eks-prod-us-east-1-api",
@@ -395,7 +395,7 @@ result = HealthCheckResult(
 ### ValidationResult
 
 ```python
-from igu.core.models import ValidationResult
+from guard.core.models import ValidationResult
 
 result = ValidationResult(
     cluster_id="eks-prod-us-east-1-api",
@@ -418,7 +418,7 @@ result = ValidationResult(
 ## Exceptions
 
 ```python
-from igu.core.exceptions import (
+from guard.core.exceptions import (
     ConfigurationError,
     RegistryError,
     HealthCheckError,
@@ -428,7 +428,7 @@ from igu.core.exceptions import (
 )
 
 try:
-    config = IguConfig.from_file("config.yaml")
+    config = GuardConfig.from_file("config.yaml")
 except ConfigurationError as e:
     print(f"Configuration error: {e}")
 
@@ -439,7 +439,7 @@ except RegistryError as e:
 ```
 
 **Exception Hierarchy**:
-- `IguError` (base exception)
+- `GuardError` (base exception)
   - `ConfigurationError` - Configuration issues
   - `RegistryError` - Cluster registry errors
   - `HealthCheckError` - Pre-check failures
@@ -452,15 +452,15 @@ except RegistryError as e:
 
 ```python
 import asyncio
-from igu.core.config import IguConfig
-from igu.registry.cluster_registry import ClusterRegistry
-from igu.checks.pre_check_engine import PreCheckEngine
-from igu.gitops.manager import GitOpsManager
-from igu.validation.engine import ValidationEngine
+from guard.core.config import GuardConfig
+from guard.registry.cluster_registry import ClusterRegistry
+from guard.checks.pre_check_engine import PreCheckEngine
+from guard.gitops.manager import GitOpsManager
+from guard.validation.engine import ValidationEngine
 
 async def main():
     # Load configuration
-    config = IguConfig.from_file("~/.guard/config.yaml")
+    config = GuardConfig.from_file("~/.guard/config.yaml")
 
     # Initialize components
     registry = ClusterRegistry(table_name=config.aws.dynamodb.table_name)

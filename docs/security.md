@@ -31,7 +31,7 @@ GUARD operates with elevated privileges to manage Istio across multiple clusters
 ✅ **Store all credentials in AWS Secrets Manager**
 ```bash
 aws secretsmanager create-secret \
-    --name igu/gitlab-token \
+    --name guard/gitlab-token \
     --secret-string "glpat-xxxxxxxxxxxx"
 ```
 
@@ -71,7 +71,7 @@ gitlab:
 
 # GOOD - Reference secret instead
 gitlab:
-  token_secret: igu/gitlab-token  # ✅ YES!
+  token_secret: guard/gitlab-token  # ✅ YES!
 ```
 
 ❌ **Never log credentials**
@@ -92,7 +92,7 @@ Store secrets with proper structure:
 #### GitLab Token
 ```json
 {
-  "name": "igu/gitlab-token",
+  "name": "guard/gitlab-token",
   "description": "GitLab personal access token for GUARD",
   "value": "glpat-xxxxxxxxxxxx"
 }
@@ -101,7 +101,7 @@ Store secrets with proper structure:
 #### Datadog Credentials
 ```json
 {
-  "name": "igu/datadog-credentials",
+  "name": "guard/datadog-credentials",
   "description": "Datadog API and App keys for GUARD",
   "value": {
     "api_key": "xxxxxxxxxxxxx",
@@ -142,8 +142,8 @@ Create an IAM role for GUARD with these policies:
         "dynamodb:BatchWriteItem"
       ],
       "Resource": [
-        "arn:aws:dynamodb:*:*:table/igu-cluster-registry",
-        "arn:aws:dynamodb:*:*:table/igu-cluster-registry/index/*"
+        "arn:aws:dynamodb:*:*:table/guard-cluster-registry",
+        "arn:aws:dynamodb:*:*:table/guard-cluster-registry/index/*"
       ]
     },
     {
@@ -419,7 +419,7 @@ development:
 # Rotate GitLab token
 NEW_TOKEN=$(gitlab-api create-token --expires-in 90d)
 aws secretsmanager update-secret \
-    --secret-id igu/gitlab-token \
+    --secret-id guard/gitlab-token \
     --secret-string "$NEW_TOKEN"
 
 # Rotate Datadog keys
@@ -489,7 +489,7 @@ aws kms create-key --description "GUARD Secrets Encryption Key"
 
 # Create secret with KMS encryption
 aws secretsmanager create-secret \
-    --name igu/gitlab-token \
+    --name guard/gitlab-token \
     --secret-string "glpat-xxx" \
     --kms-key-id arn:aws:kms:us-east-1:123:key/abc-123
 ```
@@ -529,11 +529,11 @@ gitlab-api revoke-token --token-id 123
 # Rotate to new token
 NEW_TOKEN=$(gitlab-api create-token --expires-in 90d)
 aws secretsmanager update-secret \
-    --secret-id igu/gitlab-token \
+    --secret-id guard/gitlab-token \
     --secret-string "$NEW_TOKEN"
 
 # Audit all MRs created with old token
-gitlab-api list-mrs --created-by igu --since "2024-10-01"
+gitlab-api list-mrs --created-by guard --since "2024-10-01"
 
 # Review for unauthorized changes
 ```
@@ -575,7 +575,7 @@ kubectl delete clusterrolebinding igu-reader-binding
 ```bash
 # Identify scope
 aws dynamodb query \
-    --table-name igu-cluster-registry \
+    --table-name guard-cluster-registry \
     --select COUNT
 
 # Notify security team

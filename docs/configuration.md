@@ -36,12 +36,12 @@ aws:
   profile: default               # Optional: AWS profile to use
 
   dynamodb:
-    table_name: igu-cluster-registry  # DynamoDB table for cluster registry
+    table_name: guard-cluster-registry  # DynamoDB table for cluster registry
     region: us-east-1                  # Region for DynamoDB table
 
   secrets_manager:
-    gitlab_token_secret: igu/gitlab-token                    # Secret name for GitLab token
-    datadog_credentials_secret: igu/datadog-credentials      # Secret name for Datadog credentials
+    gitlab_token_secret: guard/gitlab-token                    # Secret name for GitLab token
+    datadog_credentials_secret: guard/datadog-credentials      # Secret name for Datadog credentials
 ```
 
 ### Required IAM Permissions
@@ -78,7 +78,7 @@ Store your GitLab personal access token in AWS Secrets Manager:
 
 ```bash
 aws secretsmanager create-secret \
-    --name igu/gitlab-token \
+    --name guard/gitlab-token \
     --secret-string "glpat-xxxxxxxxxxxx"
 ```
 
@@ -108,7 +108,7 @@ Store Datadog API and App keys in AWS Secrets Manager:
 
 ```bash
 aws secretsmanager create-secret \
-    --name igu/datadog-credentials \
+    --name guard/datadog-credentials \
     --secret-string '{"api_key":"your-api-key","app_key":"your-app-key"}'
 ```
 
@@ -249,10 +249,10 @@ Each cluster entry contains:
 
 ```bash
 # From JSON file
-igu registry import --file clusters.json
+guard registry import --file clusters.json
 
 # Add single cluster
-igu registry add --cluster-id eks-prod-us-east-1-app1 \
+guard registry add --cluster-id eks-prod-us-east-1-app1 \
     --batch-id prod-wave-1 \
     --environment production \
     --region us-east-1 \
@@ -264,13 +264,13 @@ igu registry add --cluster-id eks-prod-us-east-1-app1 \
 
 ```bash
 # List all clusters
-igu registry list
+guard registry list
 
 # List clusters by batch
-igu registry list --batch prod-wave-1
+guard registry list --batch prod-wave-1
 
 # Show cluster details
-igu registry show eks-prod-us-east-1-app1
+guard registry show eks-prod-us-east-1-app1
 ```
 
 ## Environment Variables
@@ -288,7 +288,7 @@ GUARD also supports configuration via environment variables:
 Validate your configuration file:
 
 ```bash
-igu validate --config ~/.guard/config.yaml
+guard validate --config ~/.guard/config.yaml
 ```
 
 This checks:
@@ -306,7 +306,7 @@ This checks:
 3. **Start with conservative thresholds** and adjust based on experience
 4. **Enable notifications** for production batches
 5. **Use longer soak periods** for production (120+ minutes)
-6. **Test configuration** with `igu validate` before running upgrades
+6. **Test configuration** with `guard validate` before running upgrades
 7. **Keep config in version control** (excluding secrets)
 8. **Use IAM roles** instead of long-lived credentials
 9. **Enable audit logging** for compliance requirements

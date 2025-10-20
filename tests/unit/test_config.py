@@ -11,7 +11,7 @@ from guard.core.config import (
     BatchConfig,
     DatadogConfig,
     GitLabConfig,
-    IguConfig,
+    GuardConfig,
     ValidationConfig,
 )
 from guard.core.exceptions import ConfigurationError
@@ -22,7 +22,7 @@ def test_aws_config_defaults():
     config = AWSConfig(region="us-west-2")
     assert config.region == "us-west-2"
     assert config.profile is None
-    assert config.dynamodb.table_name == "igu-cluster-registry"
+    assert config.dynamodb.table_name == "guard-cluster-registry"
 
 
 def test_gitlab_config_required_fields():
@@ -51,8 +51,8 @@ def test_batch_config_creation():
     assert len(batch.clusters) == 2
 
 
-def test_igu_config_from_dict():
-    """Test creating IguConfig from dictionary."""
+def test_guard_config_from_dict():
+    """Test creating GuardConfig from dictionary."""
     config_data = {
         "aws": {"region": "us-east-1"},
         "gitlab": {"url": "https://gitlab.example.com"},
@@ -65,7 +65,7 @@ def test_igu_config_from_dict():
         ],
     }
 
-    config = IguConfig(**config_data)
+    config = GuardConfig(**config_data)
     assert config.aws.region == "us-east-1"
     assert config.gitlab.url == "https://gitlab.example.com"
     assert len(config.batches) == 1
@@ -90,7 +90,7 @@ def test_igu_config_from_file():
         temp_path = f.name
 
     try:
-        config = IguConfig.from_file(temp_path)
+        config = GuardConfig.from_file(temp_path)
         assert config.aws.region == "us-west-2"
         assert config.gitlab.url == "https://gitlab.example.com"
         assert len(config.batches) == 1
@@ -102,7 +102,7 @@ def test_igu_config_from_file():
 def test_igu_config_from_file_not_found():
     """Test error when config file not found."""
     with pytest.raises(ConfigurationError, match="Configuration file not found"):
-        IguConfig.from_file("/nonexistent/config.yaml")
+        GuardConfig.from_file("/nonexistent/config.yaml")
 
 
 def test_igu_config_from_file_invalid_yaml():
@@ -113,7 +113,7 @@ def test_igu_config_from_file_invalid_yaml():
 
     try:
         with pytest.raises(ConfigurationError, match="Failed to load configuration"):
-            IguConfig.from_file(temp_path)
+            GuardConfig.from_file(temp_path)
     finally:
         Path(temp_path).unlink()
 
@@ -131,14 +131,14 @@ def test_igu_config_from_file_invalid_schema():
 
     try:
         with pytest.raises(ConfigurationError, match="Invalid configuration"):
-            IguConfig.from_file(temp_path)
+            GuardConfig.from_file(temp_path)
     finally:
         Path(temp_path).unlink()
 
 
 def test_get_batch_found():
     """Test getting a batch by name."""
-    config = IguConfig(
+    config = GuardConfig(
         aws=AWSConfig(region="us-east-1"),
         gitlab=GitLabConfig(url="https://gitlab.example.com"),
         batches=[
@@ -155,7 +155,7 @@ def test_get_batch_found():
 
 def test_get_batch_not_found():
     """Test getting a nonexistent batch."""
-    config = IguConfig(
+    config = GuardConfig(
         aws=AWSConfig(region="us-east-1"),
         gitlab=GitLabConfig(url="https://gitlab.example.com"),
         batches=[BatchConfig(name="test", description="Test", clusters=["c1"])],
@@ -167,7 +167,7 @@ def test_get_batch_not_found():
 
 def test_config_to_dict():
     """Test converting config to dictionary."""
-    config = IguConfig(
+    config = GuardConfig(
         aws=AWSConfig(region="us-east-1"),
         gitlab=GitLabConfig(url="https://gitlab.example.com"),
     )
@@ -200,7 +200,7 @@ def test_config_expanduser():
 
     try:
         # Should not raise even though we're passing a path
-        config = IguConfig.from_file(temp_path)
+        config = GuardConfig.from_file(temp_path)
         assert config.aws.region == "us-east-1"
     finally:
         Path(temp_path).unlink()

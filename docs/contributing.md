@@ -59,11 +59,11 @@ This saves everyone time and ensures alignment.
 ```bash
 # Fork the repository on GitHub first
 # Then clone your fork
-git clone https://github.com/YOUR_USERNAME/igu.git
+git clone https://github.com/YOUR_USERNAME/guard.git
 cd igu
 
 # Add upstream remote
-git remote add upstream https://github.com/your-org/igu.git
+git remote add upstream https://github.com/adickinson72/guard.git
 
 # Install Poetry if needed
 curl -sSL https://install.python-poetry.org | python3 -
@@ -124,7 +124,7 @@ def test_my_new_feature():
 poetry run pytest tests/unit/test_my_feature.py
 
 # 3. Implement the feature
-# src/igu/my_module.py
+# src/guard/my_module.py
 
 # 4. Run tests (should pass)
 poetry run pytest tests/unit/test_my_feature.py
@@ -159,7 +159,7 @@ All code must have tests:
 ```python
 # tests/unit/test_cluster_registry.py
 import pytest
-from igu.registry.cluster_registry import ClusterRegistry
+from guard.registry.cluster_registry import ClusterRegistry
 
 def test_get_clusters_by_batch_returns_correct_clusters(mock_dynamodb_table):
     """Test that clusters are correctly filtered by batch_id."""
@@ -191,10 +191,10 @@ Before committing:
 poetry run pytest
 
 # Run with coverage
-poetry run pytest --cov=igu --cov-report=term-missing
+poetry run pytest --cov=guard --cov-report=term-missing
 
 # Ensure coverage meets threshold (90%)
-poetry run pytest --cov=igu --cov-fail-under=90
+poetry run pytest --cov=guard --cov-fail-under=90
 
 # Run linting
 poetry run ruff check .
@@ -232,7 +232,7 @@ poetry run pytest tests/unit/test_cluster_registry.py
 poetry run pytest tests/unit/test_cluster_registry.py::test_get_clusters_by_batch
 
 # With coverage
-poetry run pytest --cov=igu --cov-report=html
+poetry run pytest --cov=guard --cov-report=html
 open htmlcov/index.html
 
 # Skip slow tests
@@ -288,8 +288,8 @@ updating, and managing cluster metadata in DynamoDB.
 from typing import Any
 import logging
 
-from igu.core.models import Cluster
-from igu.core.exceptions import RegistryError
+from guard.core.models import Cluster
+from guard.core.exceptions import RegistryError
 
 
 logger = logging.getLogger(__name__)
@@ -525,7 +525,7 @@ git push upstream v1.2.0
 
 ```bash
 # Run with debug logging
-GUARD_LOG_LEVEL=DEBUG poetry run igu run --batch test --target-version 1.20.0
+GUARD_LOG_LEVEL=DEBUG poetry run guard run --batch test --target-version 1.20.0
 
 # Use pdb for debugging
 import pdb; pdb.set_trace()
@@ -541,8 +541,8 @@ import ipdb; ipdb.set_trace()
 poetry install
 
 # Test CLI commands
-poetry run igu --help
-poetry run igu validate --config examples/config.yaml.example
+poetry run guard --help
+poetry run guard validate --config examples/config.yaml.example
 ```
 
 ### Documentation
@@ -558,8 +558,8 @@ open _build/html/index.html
 
 ## Getting Help
 
-- **Questions**: Open a [GitHub Discussion](https://github.com/your-org/igu/discussions)
-- **Bugs**: Open a [GitHub Issue](https://github.com/your-org/igu/issues)
+- **Questions**: Open a [GitHub Discussion](https://github.com/adickinson72/guard/discussions)
+- **Bugs**: Open a [GitHub Issue](https://github.com/adickinson72/guard/issues)
 - **Chat**: Join #igu-dev on Slack
 
 ## Recognition

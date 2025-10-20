@@ -9,10 +9,14 @@ from guard.core.models import ClusterConfig, ValidationThresholds
 
 @dataclass
 class MetricsSnapshot:
-    """Snapshot of metrics at a point in time."""
+    """Snapshot of metrics at a point in time.
+
+    Note: Metric values can be None to indicate missing/failed metric queries.
+    This prevents masking monitoring failures by defaulting to 0.0.
+    """
 
     timestamp: datetime
-    metrics: dict[str, float]
+    metrics: dict[str, float | None]
     tags: dict[str, str]
 
 

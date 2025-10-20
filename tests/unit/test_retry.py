@@ -2,7 +2,7 @@
 
 import pytest
 
-from guard.core.exceptions import IguError
+from guard.core.exceptions import GuardError
 from guard.utils.retry import retry_on_exception, simple_retry
 
 

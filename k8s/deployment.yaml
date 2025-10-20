@@ -19,7 +19,7 @@ spec:
         app.kubernetes.io/name: guard
         app.kubernetes.io/component: automation
     spec:
-      serviceAccountName: igu
+      serviceAccountName: guard
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
@@ -29,13 +29,13 @@ spec:
       containers:
       - name: guard
         # Replace with your container registry and image tag
-        image: <YOUR_REGISTRY>/igu:latest
+        image: <YOUR_REGISTRY>/guard:latest
         imagePullPolicy: Always
         # Keep pod running for manual execution
         command: ["/bin/sleep"]
         args: ["infinity"]
         env:
-        - name: IGU_CONFIG_PATH
+        - name: GUARD_CONFIG_PATH
           value: /app/config/config.yaml
         - name: AWS_REGION
           value: us-east-1
@@ -68,6 +68,6 @@ spec:
       volumes:
       - name: config
         configMap:
-          name: igu-config
+          name: guard-config
           optional: true
       restartPolicy: Always

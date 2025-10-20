@@ -47,7 +47,7 @@ pip install igu
 
 3. **Install from source:**
 ```bash
-git clone https://github.com/your-org/igu.git
+git clone https://github.com/adickinson72/guard.git
 cd igu
 pip install -e .
 ```
@@ -56,7 +56,7 @@ pip install -e .
 
 **Symptoms:**
 ```bash
-$ igu --version
+$ guard --version
 ModuleNotFoundError: No module named 'igu'
 ```
 
@@ -89,7 +89,7 @@ pip install igu
 
 **Symptoms:**
 ```bash
-$ igu run --batch test --target-version 1.20.0
+$ guard run --batch test --target-version 1.20.0
 Error: Configuration file not found: /home/user/.igu/config.yaml
 ```
 
@@ -107,15 +107,15 @@ cp examples/config.yaml.example ~/.guard/config.yaml
 
 3. **Specify config path:**
 ```bash
-igu run --config /path/to/config.yaml --batch test --target-version 1.20.0
+guard run --config /path/to/config.yaml --batch test --target-version 1.20.0
 ```
 
 ### Issue: Invalid configuration
 
 **Symptoms:**
 ```bash
-$ igu validate
-Error: Invalid configuration: 1 validation error for IguConfig
+$ guard validate
+Error: Invalid configuration: 1 validation error for GuardConfig
 aws
   field required (type=value_error.missing)
 ```
@@ -138,7 +138,7 @@ gitlab:
 
 3. **Use validation command:**
 ```bash
-igu validate --config ~/.guard/config.yaml --verbose
+guard validate --config ~/.guard/config.yaml --verbose
 ```
 
 ## AWS/DynamoDB Issues
@@ -147,7 +147,7 @@ igu validate --config ~/.guard/config.yaml --verbose
 
 **Symptoms:**
 ```bash
-$ igu run --batch test --target-version 1.20.0
+$ guard run --batch test --target-version 1.20.0
 Error: Unable to locate credentials
 ```
 
@@ -178,16 +178,16 @@ aws:
 
 **Symptoms:**
 ```bash
-$ igu list
+$ guard list
 Error: An error occurred (ResourceNotFoundException) when calling the Query operation:
-Requested resource not found: Table: igu-cluster-registry not found
+Requested resource not found: Table: guard-cluster-registry not found
 ```
 
 **Solutions:**
 
 1. **Verify table exists:**
 ```bash
-aws dynamodb describe-table --table-name igu-cluster-registry
+aws dynamodb describe-table --table-name guard-cluster-registry
 ```
 
 2. **Create table if missing:**
@@ -195,7 +195,7 @@ aws dynamodb describe-table --table-name igu-cluster-registry
 ./scripts/setup-dynamodb.sh
 # Or manually:
 aws dynamodb create-table \
-    --table-name igu-cluster-registry \
+    --table-name guard-cluster-registry \
     --attribute-definitions AttributeName=cluster_id,AttributeType=S \
     --key-schema AttributeName=cluster_id,KeyType=HASH \
     --provisioned-throughput ReadCapacityUnits=5,WriteCapacityUnits=5
@@ -214,7 +214,7 @@ aws dynamodb create-table \
 
 **Symptoms:**
 ```bash
-$ igu run --batch prod --target-version 1.20.0
+$ guard run --batch prod --target-version 1.20.0
 Error: An error occurred (AccessDenied) when calling the AssumeRole operation:
 User is not authorized to perform: sts:AssumeRole
 ```
@@ -249,7 +249,7 @@ aws sts assume-role \
 
 **Symptoms:**
 ```bash
-$ igu run --batch test --target-version 1.20.0
+$ guard run --batch test --target-version 1.20.0
 Error: GitLab authentication failed: 401 Unauthorized
 ```
 
@@ -257,12 +257,12 @@ Error: GitLab authentication failed: 401 Unauthorized
 
 1. **Verify token in Secrets Manager:**
 ```bash
-aws secretsmanager get-secret-value --secret-id igu/gitlab-token
+aws secretsmanager get-secret-value --secret-id guard/gitlab-token
 ```
 
 2. **Check token validity:**
 ```bash
-TOKEN=$(aws secretsmanager get-secret-value --secret-id igu/gitlab-token --query SecretString --output text)
+TOKEN=$(aws secretsmanager get-secret-value --secret-id guard/gitlab-token --query SecretString --output text)
 curl -H "PRIVATE-TOKEN: $TOKEN" https://gitlab.company.com/api/v4/user
 ```
 
@@ -272,7 +272,7 @@ curl -H "PRIVATE-TOKEN: $TOKEN" https://gitlab.company.com/api/v4/user
    - Update secret:
 ```bash
 aws secretsmanager update-secret \
-    --secret-id igu/gitlab-token \
+    --secret-id guard/gitlab-token \
     --secret-string "glpat-xxxxxxxxxxxx"
 ```
 
@@ -280,7 +280,7 @@ aws secretsmanager update-secret \
 
 **Symptoms:**
 ```bash
-$ igu run --batch test --target-version 1.20.0
+$ guard run --batch test --target-version 1.20.0
 Error: 403 Forbidden: You don't have permission to create merge requests
 ```
 
@@ -297,7 +297,7 @@ Error: 403 Forbidden: You don't have permission to create merge requests
 3. **Test manually:**
 ```bash
 # Get token
-TOKEN=$(aws secretsmanager get-secret-value --secret-id igu/gitlab-token --query SecretString --output text)
+TOKEN=$(aws secretsmanager get-secret-value --secret-id guard/gitlab-token --query SecretString --output text)
 
 # Test MR creation permission
 curl -X POST -H "PRIVATE-TOKEN: $TOKEN" \
@@ -311,7 +311,7 @@ curl -X POST -H "PRIVATE-TOKEN: $TOKEN" \
 
 **Symptoms:**
 ```bash
-$ igu run --batch test --target-version 1.20.0
+$ guard run --batch test --target-version 1.20.0
 Error: Datadog API error: 403 Forbidden
 ```
 
@@ -319,14 +319,14 @@ Error: Datadog API error: 403 Forbidden
 
 1. **Verify credentials:**
 ```bash
-aws secretsmanager get-secret-value --secret-id igu/datadog-credentials
+aws secretsmanager get-secret-value --secret-id guard/datadog-credentials
 # Should return: {"api_key":"xxx","app_key":"xxx"}
 ```
 
 2. **Test Datadog API:**
 ```bash
 # Get credentials
-CREDS=$(aws secretsmanager get-secret-value --secret-id igu/datadog-credentials --query SecretString --output text)
+CREDS=$(aws secretsmanager get-secret-value --secret-id guard/datadog-credentials --query SecretString --output text)
 API_KEY=$(echo $CREDS | jq -r .api_key)
 APP_KEY=$(echo $CREDS | jq -r .app_key)
 
@@ -344,7 +344,7 @@ curl -X GET "https://api.datadoghq.com/api/v1/validate" \
 
 **Symptoms:**
 ```bash
-$ igu run --batch test --target-version 1.20.0
+$ guard run --batch test --target-version 1.20.0
 Warning: No Datadog metrics found for cluster eks-test
 ```
 
@@ -381,7 +381,7 @@ datadog:
 
 **Symptoms:**
 ```bash
-$ igu run --batch test --target-version 1.20.0
+$ guard run --batch test --target-version 1.20.0
 Error: Unable to connect to the server: dial tcp: lookup xxx.eks.amazonaws.com: no such host
 ```
 
@@ -410,7 +410,7 @@ kubectl get nodes
 
 **Symptoms:**
 ```bash
-$ igu run --batch test --target-version 1.20.0
+$ guard run --batch test --target-version 1.20.0
 Error: istioctl command not found
 ```
 
@@ -439,7 +439,7 @@ source ~/.bashrc
 
 **Symptoms:**
 ```bash
-$ igu run --batch test --target-version 1.20.0
+$ guard run --batch test --target-version 1.20.0
 ✗ Cluster eks-test: Kubernetes health check failed
   Error: Unable to reach API server
 ```
@@ -469,7 +469,7 @@ kubectl cluster-info
 
 **Symptoms:**
 ```bash
-$ igu run --batch test --target-version 1.20.0
+$ guard run --batch test --target-version 1.20.0
 ✗ Cluster eks-test: Istio health check failed
   Error: istioctl analyze found 3 issues
 ```
@@ -503,7 +503,7 @@ pre_checks:
 
 **Symptoms:**
 ```bash
-$ igu run --batch test --target-version 1.20.0
+$ guard run --batch test --target-version 1.20.0
 ✗ Cluster eks-test: Active Datadog alerts detected
   Alerts:
     - High error rate on API service (CRITICAL)
@@ -519,13 +519,13 @@ $ igu run --batch test --target-version 1.20.0
 2. **Wait for alerts to clear:**
 ```bash
 # Re-run pre-checks after fixing issues
-igu run --batch test --target-version 1.20.0
+guard run --batch test --target-version 1.20.0
 ```
 
 3. **Override if false positive:**
 ```bash
 # Only if you're certain the alert is safe to ignore
-igu run --batch test --target-version 1.20.0 --ignore-alerts
+guard run --batch test --target-version 1.20.0 --ignore-alerts
 ```
 
 ## Validation Failures
@@ -534,7 +534,7 @@ igu run --batch test --target-version 1.20.0 --ignore-alerts
 
 **Symptoms:**
 ```bash
-$ igu monitor --batch test
+$ guard monitor --batch test
 ✗ Validation failed: Latency increased 15% (threshold: 10%)
   Baseline P95: 200ms
   Current P95: 230ms
@@ -561,14 +561,14 @@ validation:
 
 3. **Rollback if problematic:**
 ```bash
-igu rollback --batch test
+guard rollback --batch test
 ```
 
 ### Issue: Error rate threshold exceeded
 
 **Symptoms:**
 ```bash
-$ igu monitor --batch test
+$ guard monitor --batch test
 ✗ Validation failed: Error rate 0.15% exceeds threshold 0.1%
 ```
 
@@ -587,14 +587,14 @@ kubectl logs -n istio-system -l app=istio-ingressgateway --tail=100
 
 3. **Rollback:**
 ```bash
-igu rollback --batch test
+guard rollback --batch test
 ```
 
 ### Issue: Flux not syncing
 
 **Symptoms:**
 ```bash
-$ igu monitor --batch test
+$ guard monitor --batch test
 Waiting for Flux sync...
 Error: Flux sync timeout after 15 minutes
 ```
@@ -625,7 +625,7 @@ flux reconcile helmrelease istio -n istio-system
 
 **Symptoms:**
 ```bash
-$ igu rollback --batch test
+$ guard rollback --batch test
 Error: Failed to create rollback MR: 500 Internal Server Error
 ```
 
@@ -638,7 +638,7 @@ curl https://gitlab.company.com
 
 2. **Verify GitLab token:**
 ```bash
-aws secretsmanager get-secret-value --secret-id igu/gitlab-token
+aws secretsmanager get-secret-value --secret-id guard/gitlab-token
 ```
 
 3. **Manual rollback:**
@@ -654,7 +654,7 @@ aws secretsmanager get-secret-value --secret-id igu/gitlab-token
 
 **Symptoms:**
 ```bash
-$ igu run --batch large-batch --target-version 1.20.0
+$ guard run --batch large-batch --target-version 1.20.0
 # Hangs for 30+ minutes
 ```
 
@@ -688,7 +688,7 @@ datadog:
 
 **Symptoms:**
 ```bash
-$ igu run --batch large-batch --target-version 1.20.0
+$ guard run --batch large-batch --target-version 1.20.0
 Error: MemoryError: Unable to allocate array
 ```
 
@@ -715,30 +715,30 @@ If you're still stuck:
 
 1. **Enable verbose logging:**
 ```bash
-igu run --batch test --target-version 1.20.0 --verbose
+guard run --batch test --target-version 1.20.0 --verbose
 ```
 
 2. **Check logs:**
 ```bash
 # Application logs
-tail -f ~/.guard/logs/igu.log
+tail -f ~/.guard/logs/guard.log
 
 # System logs
-journalctl -u igu -f
+journalctl -u guard -f
 ```
 
 3. **Collect diagnostic info:**
 ```bash
-igu diagnose --batch test --output diagnostic-report.json
+guard diagnose --batch test --output diagnostic-report.json
 # Share this report when asking for help
 ```
 
 4. **Open an issue:**
-   - [GitHub Issues](https://github.com/your-org/igu/issues)
+   - [GitHub Issues](https://github.com/adickinson72/guard/issues)
    - Include diagnostic report
    - Include error messages
    - Include steps to reproduce
 
 5. **Community support:**
-   - Slack: #igu-support
-   - [GitHub Discussions](https://github.com/your-org/igu/discussions)
+   - Slack: #guard-support
+   - [GitHub Discussions](https://github.com/adickinson72/guard/discussions)

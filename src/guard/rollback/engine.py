@@ -120,7 +120,9 @@ This is an automated rollback created by IGU.
             )
 
             # Create MR
-            mr_title = f"[ROLLBACK] Istio {current_version} → {previous_version} ({cluster.batch_id})"
+            mr_title = (
+                f"[ROLLBACK] Istio {current_version} → {previous_version} ({cluster.batch_id})"
+            )
             mr_description = f"""## Automated Rollback
 
 **Cluster Batch**: {cluster.batch_id}

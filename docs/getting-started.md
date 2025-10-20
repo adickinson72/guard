@@ -67,7 +67,7 @@ pip install igu
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/igu.git
+git clone https://github.com/adickinson72/guard.git
 cd igu
 
 # Install with Poetry
@@ -81,8 +81,8 @@ pip install -e .
 ### Verify Installation
 
 ```bash
-igu --version
-igu --help
+guard --version
+guard --help
 ```
 
 ## Initial Setup
@@ -93,7 +93,7 @@ Create a DynamoDB table for the cluster registry:
 
 ```bash
 aws dynamodb create-table \
-    --table-name igu-cluster-registry \
+    --table-name guard-cluster-registry \
     --attribute-definitions \
         AttributeName=cluster_id,AttributeType=S \
         AttributeName=batch_id,AttributeType=S \
@@ -120,7 +120,7 @@ Create a GitLab personal access token:
 
 ```bash
 aws secretsmanager create-secret \
-    --name igu/gitlab-token \
+    --name guard/gitlab-token \
     --description "GitLab token for GUARD" \
     --secret-string "glpat-xxxxxxxxxxxx" \
     --region us-east-1
@@ -135,7 +135,7 @@ Get your Datadog API and App keys:
 
 ```bash
 aws secretsmanager create-secret \
-    --name igu/datadog-credentials \
+    --name guard/datadog-credentials \
     --description "Datadog credentials for GUARD" \
     --secret-string '{
         "api_key": "your-datadog-api-key",
@@ -166,11 +166,11 @@ Update the following required fields:
 aws:
   region: us-east-1
   dynamodb:
-    table_name: igu-cluster-registry
+    table_name: guard-cluster-registry
     region: us-east-1
   secrets_manager:
-    gitlab_token_secret: igu/gitlab-token
-    datadog_credentials_secret: igu/datadog-credentials
+    gitlab_token_secret: guard/gitlab-token
+    datadog_credentials_secret: guard/datadog-credentials
 
 gitlab:
   url: https://gitlab.yourcompany.com  # Update with your GitLab URL
@@ -193,7 +193,7 @@ Add your first test cluster to the registry:
 
 ```bash
 # Using CLI (example)
-igu registry add \
+guard registry add \
     --cluster-id eks-test-us-east-1 \
     --batch-id test \
     --environment test \
@@ -227,7 +227,7 @@ cat > clusters.json <<EOF
 EOF
 
 # 2. Import
-igu registry import --file clusters.json
+guard registry import --file clusters.json
 ```
 
 ### Step 5: Validate Setup
@@ -236,7 +236,7 @@ Verify everything is configured correctly:
 
 ```bash
 # Validate configuration
-igu validate --config ~/.guard/config.yaml
+guard validate --config ~/.guard/config.yaml
 
 # Expected output:
 # ✓ Configuration file is valid
@@ -247,7 +247,7 @@ igu validate --config ~/.guard/config.yaml
 # ✓ All secrets accessible
 
 # List clusters
-igu list --batch test
+guard list --batch test
 
 # Expected output:
 # Batch: test
@@ -263,7 +263,7 @@ Now let's perform your first Istio upgrade on the test cluster!
 
 ```bash
 # Run pre-upgrade health checks
-igu run --batch test --target-version 1.20.0
+guard run --batch test --target-version 1.20.0
 
 # This will:
 # 1. Query cluster registry for 'test' batch
@@ -295,7 +295,7 @@ Cluster: eks-test-us-east-1
 All pre-checks passed!
 
 Creating GitLab merge request...
-✓ Branch created: igu/upgrade-istio-1.20.0-test-20241018
+✓ Branch created: guard/upgrade-istio-1.20.0-test-20241018
 ✓ Flux config updated
 ✓ Merge request created: https://gitlab.yourcompany.com/infra/k8s-clusters/-/merge_requests/123
 
@@ -303,7 +303,7 @@ Next steps:
 1. Review the merge request
 2. Verify health report and Datadog dashboards
 3. Approve and merge the MR
-4. Run: igu monitor --batch test
+4. Run: guard monitor --batch test
 ```
 
 ### Step 2: Review and Merge MR
@@ -349,7 +349,7 @@ After merging the MR, monitor the upgrade:
 
 ```bash
 # Monitor upgrade and run post-upgrade validation
-igu monitor --batch test --soak-period 60
+guard monitor --batch test --soak-period 60
 
 # This will:
 # 1. Wait for Flux to sync changes
@@ -478,28 +478,28 @@ Follow this recommended order:
 
 ```bash
 # 1. Test
-igu run --batch test --target-version 1.20.0
-igu monitor --batch test
+guard run --batch test --target-version 1.20.0
+guard monitor --batch test
 
 # 2. Development (wave 1)
-igu run --batch dev-wave-1 --target-version 1.20.0
-igu monitor --batch dev-wave-1
+guard run --batch dev-wave-1 --target-version 1.20.0
+guard monitor --batch dev-wave-1
 
 # 3. Development (wave 2)
-igu run --batch dev-wave-2 --target-version 1.20.0
-igu monitor --batch dev-wave-2
+guard run --batch dev-wave-2 --target-version 1.20.0
+guard monitor --batch dev-wave-2
 
 # 4. Staging
-igu run --batch staging --target-version 1.20.0
-igu monitor --batch staging --soak-period 120  # Longer soak
+guard run --batch staging --target-version 1.20.0
+guard monitor --batch staging --soak-period 120  # Longer soak
 
 # 5. Production (wave 1 - critical)
-igu run --batch prod-wave-1 --target-version 1.20.0
-igu monitor --batch prod-wave-1 --soak-period 120
+guard run --batch prod-wave-1 --target-version 1.20.0
+guard monitor --batch prod-wave-1 --soak-period 120
 
 # 6. Production (wave 2 - remaining)
-igu run --batch prod-wave-2 --target-version 1.20.0
-igu monitor --batch prod-wave-2 --soak-period 120
+guard run --batch prod-wave-2 --target-version 1.20.0
+guard monitor --batch prod-wave-2 --soak-period 120
 ```
 
 ### Customize Configuration
@@ -522,8 +522,8 @@ Integrate with your CI/CD:
 istio-upgrade:
   stage: upgrade
   script:
-    - igu run --batch $BATCH --target-version $VERSION
-    - igu monitor --batch $BATCH
+    - guard run --batch $BATCH --target-version $VERSION
+    - guard monitor --batch $BATCH
   only:
     - schedules
   variables:
@@ -537,10 +537,10 @@ istio-upgrade:
 
 ```bash
 # Get detailed error info
-igu run --batch test --target-version 1.20.0 --verbose
+guard run --batch test --target-version 1.20.0 --verbose
 
 # Check specific cluster
-igu registry show eks-test-us-east-1
+guard registry show eks-test-us-east-1
 
 # Verify Kubernetes access
 kubectl cluster-info
@@ -550,7 +550,7 @@ kubectl cluster-info
 
 ```bash
 # Verify GitLab token
-aws secretsmanager get-secret-value --secret-id igu/gitlab-token
+aws secretsmanager get-secret-value --secret-id guard/gitlab-token
 
 # Test GitLab connectivity
 curl -H "PRIVATE-TOKEN: your-token" https://gitlab.yourcompany.com/api/v4/user
@@ -561,17 +561,17 @@ curl -H "PRIVATE-TOKEN: your-token" https://gitlab.yourcompany.com/api/v4/user
 ```bash
 # Check Datadog metrics manually
 # View logs
-igu monitor --batch test --verbose
+guard monitor --batch test --verbose
 
 # Skip validation (for testing)
-igu monitor --batch test --skip-validation
+guard monitor --batch test --skip-validation
 ```
 
 ### Need to rollback
 
 ```bash
 # Trigger manual rollback
-igu rollback --batch test
+guard rollback --batch test
 
 # This creates a rollback MR - review and merge to revert
 ```
@@ -580,8 +580,8 @@ igu rollback --batch test
 
 - **Documentation**: [docs/](.)
 - **Examples**: [docs/examples/](examples/)
-- **Issues**: [GitHub Issues](https://github.com/your-org/igu/issues)
-- **Slack**: #igu-support
+- **Issues**: [GitHub Issues](https://github.com/adickinson72/guard/issues)
+- **Slack**: #guard-support
 
 ## What's Next?
 

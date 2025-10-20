@@ -20,7 +20,7 @@ Running GUARD inside an EKS pod provides several benefits:
 
 ## Architecture
 
-IGu runs in a dedicated `igu-system` namespace with:
+IGu runs in a dedicated `guard-system` namespace with:
 
 - **ServiceAccount**: Annotated with IAM role ARN for Pod Identity
 - **Deployment**: Long-running pod for manual execution
@@ -33,10 +33,10 @@ IGu runs in a dedicated `igu-system` namespace with:
 
 ```bash
 # Build the Docker image
-docker build -t <YOUR_REGISTRY>/igu:latest .
+docker build -t <YOUR_REGISTRY>/guard:latest .
 
 # Push to container registry
-docker push <YOUR_REGISTRY>/igu:latest
+docker push <YOUR_REGISTRY>/guard:latest
 ```
 
 ### 2. Configure IAM Role
@@ -55,7 +55,7 @@ Create an IAM role with the following trust policy:
       "Action": "sts:AssumeRoleWithWebIdentity",
       "Condition": {
         "StringEquals": {
-          "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>:sub": "system:serviceaccount:igu-system:igu",
+          "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>:sub": "system:serviceaccount:guard-system:guard",
           "oidc.eks.<REGION>.amazonaws.com/id/<OIDC_ID>:aud": "sts.amazonaws.com"
         }
       }
@@ -101,17 +101,17 @@ kubectl apply -k k8s/
 
 ```bash
 # Check namespace
-kubectl get ns igu-system
+kubectl get ns guard-system
 
 # Check pods
-kubectl get pods -n igu-system
+kubectl get pods -n guard-system
 
 # Check service account
-kubectl get sa -n igu-system igu -o yaml
+kubectl get sa -n guard-system guard -o yaml
 
 # Verify RBAC
-kubectl get clusterrole igu-manager
-kubectl get clusterrolebinding igu-manager-binding
+kubectl get clusterrole guard-manager
+kubectl get clusterrolebinding guard-manager-binding
 ```
 
 ## Usage
@@ -122,17 +122,17 @@ Execute GUARD commands from within the running pod:
 
 ```bash
 # Get shell access to the pod
-kubectl exec -it -n igu-system deploy/igu -- /bin/bash
+kubectl exec -it -n guard-system deploy/guard -- /bin/bash
 
 # Run GUARD commands
-igu run --batch dev-wave-1 --target-version 1.20.0
-igu status --cluster prod-us-east-1
+guard run --batch dev-wave-1 --target-version 1.20.0
+guard status --cluster prod-us-east-1
 ```
 
 Or execute directly without shell:
 
 ```bash
-kubectl exec -n igu-system deploy/igu -- igu run --batch dev-wave-1 --target-version 1.20.0
+kubectl exec -n guard-system deploy/guard -- guard run --batch dev-wave-1 --target-version 1.20.0
 ```
 
 ### Scheduled Execution (CronJob)
@@ -153,20 +153,20 @@ spec:
 To trigger a manual run from the CronJob:
 
 ```bash
-kubectl create job -n igu-system manual-upgrade --from=cronjob/igu-scheduled-upgrade
+kubectl create job -n guard-system manual-upgrade --from=cronjob/guard-scheduled-upgrade
 ```
 
 ### View Logs
 
 ```bash
 # Deployment logs
-kubectl logs -n igu-system deploy/igu -f
+kubectl logs -n guard-system deploy/guard -f
 
 # CronJob logs (latest job)
-kubectl logs -n igu-system job/igu-scheduled-upgrade-<timestamp> -f
+kubectl logs -n guard-system job/guard-scheduled-upgrade-<timestamp> -f
 
 # List all jobs
-kubectl get jobs -n igu-system
+kubectl get jobs -n guard-system
 ```
 
 ## Configuration
@@ -192,7 +192,7 @@ After updating, apply the changes:
 kubectl apply -f k8s/configmap.yaml
 
 # Restart deployment to pick up new config
-kubectl rollout restart -n igu-system deployment/igu
+kubectl rollout restart -n guard-system deployment/guard
 ```
 
 ### Environment Variables
@@ -227,7 +227,7 @@ After a successful Istio control plane upgrade:
 The restart functionality is enabled by default. To disable:
 
 ```python
-from igu.validation.engine import ValidationEngine
+from guard.validation.engine import ValidationEngine
 
 # Disable pod restart
 engine = ValidationEngine(
@@ -239,8 +239,8 @@ engine = ValidationEngine(
 ### Usage
 
 ```python
-from igu.clients.kubernetes_client import KubernetesClient
-from igu.validation.engine import ValidationEngine
+from guard.clients.kubernetes_client import KubernetesClient
+from guard.validation.engine import ValidationEngine
 
 # Initialize clients
 k8s_client = KubernetesClient(context="my-cluster")
@@ -280,13 +280,13 @@ If the pod cannot assume the IAM role:
 
 ```bash
 # Check service account annotation
-kubectl get sa -n igu-system igu -o jsonpath='{.metadata.annotations}'
+kubectl get sa -n guard-system guard -o jsonpath='{.metadata.annotations}'
 
 # Verify environment variables in pod
-kubectl exec -n igu-system deploy/igu -- env | grep AWS
+kubectl exec -n guard-system deploy/guard -- env | grep AWS
 
 # Test AWS credentials
-kubectl exec -n igu-system deploy/igu -- aws sts get-caller-identity
+kubectl exec -n guard-system deploy/guard -- aws sts get-caller-identity
 ```
 
 ### Permission Errors
@@ -295,11 +295,11 @@ If GUARD cannot restart workloads:
 
 ```bash
 # Verify RBAC is applied
-kubectl get clusterrole igu-manager
-kubectl get clusterrolebinding igu-manager-binding
+kubectl get clusterrole guard-manager
+kubectl get clusterrolebinding guard-manager-binding
 
 # Check what permissions the service account has
-kubectl auth can-i patch deployments --as=system:serviceaccount:igu-system:igu -n default
+kubectl auth can-i patch deployments --as=system:serviceaccount:guard-system:guard -n default
 ```
 
 ### Image Pull Errors
@@ -308,17 +308,17 @@ If pods fail to pull the image:
 
 ```bash
 # Check pod events
-kubectl describe pod -n igu-system <pod-name>
+kubectl describe pod -n guard-system <pod-name>
 
 # Verify image exists
-docker pull <YOUR_REGISTRY>/igu:latest
+docker pull <YOUR_REGISTRY>/guard:latest
 
 # If using private registry, create imagePullSecret
 kubectl create secret docker-registry regcred \
   --docker-server=<YOUR_REGISTRY> \
   --docker-username=<USERNAME> \
   --docker-password=<PASSWORD> \
-  -n igu-system
+  -n guard-system
 
 # Add to deployment.yaml
 spec:

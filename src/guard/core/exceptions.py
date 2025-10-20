@@ -1,49 +1,49 @@
 """Custom exceptions for GUARD."""
 
 
-class IguError(Exception):
+class GuardError(Exception):
     """Base exception for all GUARD errors."""
 
 
-class ConfigurationError(IguError):
+class ConfigurationError(GuardError):
     """Configuration-related errors."""
 
 
-class PreCheckFailedError(IguError):
+class PreCheckFailedError(GuardError):
     """Pre-check validation failed."""
 
 
-class ValidationFailedError(IguError):
+class ValidationFailedError(GuardError):
     """Post-upgrade validation failed."""
 
 
-class ClusterNotFoundError(IguError):
+class ClusterNotFoundError(GuardError):
     """Cluster not found in registry."""
 
 
-class GitOpsError(IguError):
+class GitOpsError(GuardError):
     """GitLab/Git operation failed."""
 
 
-class AWSError(IguError):
+class AWSError(GuardError):
     """AWS operation failed."""
 
 
-class DatadogError(IguError):
+class DatadogError(GuardError):
     """Datadog operation failed."""
 
 
-class KubernetesError(IguError):
+class KubernetesError(GuardError):
     """Kubernetes operation failed."""
 
 
-class IstioError(IguError):
+class IstioError(GuardError):
     """Istio operation failed."""
 
 
-class RollbackError(IguError):
+class RollbackError(GuardError):
     """Rollback operation failed."""
 
 
-class LockAcquisitionError(IguError):
+class LockAcquisitionError(GuardError):
     """Failed to acquire distributed lock."""
