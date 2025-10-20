@@ -202,6 +202,54 @@ class GitLabClient:
 
     @rate_limited("gitlab_api")
     @retry_on_exception(exceptions=(GitlabError,), max_attempts=3)
+    def list_merge_requests(
+        self,
+        project_id: str | int,
+        state: str = "opened",
+        source_branch: str | None = None,
+    ) -> list[Any]:
+        """List merge requests for a project.
+
+        Args:
+            project_id: Project ID or path
+            state: MR state to filter (opened, closed, merged, all)
+            source_branch: Optional source branch filter
+
+        Returns:
+            List of MR objects
+
+        Raises:
+            GitOpsError: If listing fails
+        """
+        try:
+            logger.debug(
+                "listing_merge_requests",
+                project_id=project_id,
+                state=state,
+                source_branch=source_branch,
+            )
+
+            project = self.get_project(project_id)
+
+            filters = {"state": state}
+            if source_branch:
+                filters["source_branch"] = source_branch
+
+            mrs = project.mergerequests.list(**filters)
+
+            logger.info("merge_requests_listed", project_id=project_id, count=len(mrs))
+            return mrs
+
+        except GitlabError as e:
+            logger.error(
+                "list_merge_requests_failed",
+                project_id=project_id,
+                error=str(e),
+            )
+            raise GitOpsError(f"Failed to list MRs for {project_id}: {e}") from e
+
+    @rate_limited("gitlab_api")
+    @retry_on_exception(exceptions=(GitlabError,), max_attempts=3)
     def create_merge_request(
         self,
         project_id: str | int,
@@ -211,8 +259,9 @@ class GitLabClient:
         description: str,
         assignee_id: int | None = None,
         draft: bool = True,
+        skip_if_exists: bool = True,
     ) -> Any:
-        """Create a merge request.
+        """Create a merge request with idempotency checks.
 
         Args:
             project_id: Project ID or path
@@ -222,9 +271,10 @@ class GitLabClient:
             description: MR description
             assignee_id: User ID to assign (optional)
             draft: Create as draft MR (default: True)
+            skip_if_exists: Skip creation if open MR exists (default: True)
 
         Returns:
-            MR object
+            MR object (existing or newly created)
 
         Raises:
             GitOpsError: If MR creation fails
@@ -236,6 +286,24 @@ class GitLabClient:
                 source_branch=source_branch,
                 target_branch=target_branch,
             )
+
+            # Check for existing open MRs from the same source branch
+            if skip_if_exists:
+                existing_mrs = self.list_merge_requests(
+                    project_id=project_id,
+                    state="opened",
+                    source_branch=source_branch,
+                )
+
+                if existing_mrs:
+                    existing_mr = existing_mrs[0]
+                    logger.info(
+                        "merge_request_already_exists",
+                        mr_iid=existing_mr.iid,
+                        mr_url=existing_mr.web_url,
+                        source_branch=source_branch,
+                    )
+                    return existing_mr
 
             project = self.get_project(project_id)
 

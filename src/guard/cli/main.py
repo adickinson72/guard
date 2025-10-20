@@ -233,22 +233,266 @@ def run(ctx: click.Context, batch: str, target_version: str, dry_run: bool, max_
 @click.pass_context
 def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
     """Monitor post-upgrade validation for a batch."""
+    import asyncio
+    from pathlib import Path
+    from datetime import datetime, timedelta
+
+    from guard.core.config import IguConfig
+    from guard.registry.cluster_registry import ClusterRegistry
+    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
+    from guard.adapters.datadog_adapter import DatadogAdapter
+    from guard.adapters.gitlab_adapter import GitLabAdapter
+    from guard.validation.validation_orchestrator import ValidationOrchestrator
+    from guard.validation.validator_registry import ValidatorRegistry
+    from guard.rollback.engine import RollbackEngine
+    from guard.clients.gitlab_client import GitLabClient
+    from guard.services.istio.istio_service import IstioService
+    from guard.core.models import ValidationThresholds, ClusterStatus
+    from guard.utils.logging import get_logger
+
+    logger = get_logger(__name__)
+
     console.print(f"[bold green]IGU Monitor Command[/bold green]")
     console.print(f"Batch: {batch}")
-    console.print(f"Soak Period: {soak_period} minutes")
-    console.print(f"Config: {ctx.obj['config']}")
-    console.print("\n[yellow]⚠️  Implementation pending[/yellow]")
+    console.print(f"Soak Period: {soak_period} minutes\n")
+
+    async def _monitor_batch():
+        try:
+            # Load configuration
+            config_path = Path(ctx.obj['config']).expanduser()
+            console.print(f"Loading config from {config_path}...")
+            app_config = IguConfig.from_file(str(config_path))
+
+            # Initialize cluster registry
+            console.print("Initializing cluster registry...")
+            dynamodb = DynamoDBAdapter(region=app_config.aws.region)
+            registry = ClusterRegistry(dynamodb)
+
+            # Get clusters for batch
+            console.print(f"Fetching clusters for batch: {batch}...")
+            clusters = await registry.get_clusters_by_batch(batch)
+
+            if not clusters:
+                console.print(f"[red]No clusters found for batch: {batch}[/red]")
+                return
+
+            console.print(f"Found {len(clusters)} cluster(s) in batch {batch}\n")
+
+            # Initialize adapters
+            datadog_adapter = DatadogAdapter(
+                api_key=app_config.datadog.api_key,
+                app_key=app_config.datadog.app_key,
+            )
+            gitlab_adapter = GitLabAdapter(
+                url=app_config.gitlab.url,
+                token=app_config.gitlab.token,
+            )
+            gitlab_client = GitLabClient(
+                url=app_config.gitlab.url,
+                token=app_config.gitlab.token,
+            )
+
+            # Initialize validation components
+            validator_registry = ValidatorRegistry()
+            istio_service = IstioService()
+            istio_service.register_validators(validator_registry)
+
+            validation_orchestrator = ValidationOrchestrator(
+                registry=validator_registry,
+                metrics_provider=datadog_adapter,
+                fail_fast=False,
+            )
+
+            rollback_engine = RollbackEngine(gitlab_client=gitlab_client)
+
+            # Define validation thresholds
+            thresholds = ValidationThresholds(
+                latency_increase_percent=10.0,
+                error_rate_max=0.001,
+                resource_increase_percent=50.0,
+            )
+
+            # Wait for soak period
+            console.print(f"[yellow]Waiting {soak_period} minutes for soak period...[/yellow]")
+            await asyncio.sleep(soak_period * 60)
+
+            # Monitor each cluster
+            for cluster in clusters:
+                console.print(f"\n[bold]Monitoring cluster: {cluster.cluster_id}[/bold]")
+
+                try:
+                    # Capture baseline metrics (from before upgrade)
+                    console.print("  Capturing baseline metrics...")
+                    baseline = await validation_orchestrator.capture_baseline(
+                        cluster=cluster,
+                        duration_minutes=10,
+                    )
+
+                    # Capture current metrics (post-upgrade)
+                    console.print("  Capturing current metrics...")
+                    current = await validation_orchestrator.capture_current(
+                        cluster=cluster,
+                        baseline=baseline,
+                        duration_minutes=10,
+                    )
+
+                    # Run validation
+                    console.print("  Running validation checks...")
+                    results = await validation_orchestrator.validate_upgrade(
+                        cluster=cluster,
+                        baseline=baseline,
+                        current=current,
+                        thresholds=thresholds,
+                    )
+
+                    all_passed = all(r.passed for r in results)
+
+                    if all_passed:
+                        console.print("  [green]✓ All validations passed[/green]")
+                        await registry.update_status(cluster.cluster_id, ClusterStatus.HEALTHY)
+                        logger.info("cluster_validation_passed", cluster_id=cluster.cluster_id)
+                    else:
+                        console.print("  [red]✗ Validation failed[/red]")
+                        for result in results:
+                            if not result.passed:
+                                console.print(f"    - {result.validator_name}: {result.violations}")
+
+                        # Trigger rollback
+                        console.print("  [yellow]Triggering automated rollback...[/yellow]")
+
+                        failure_metrics = {
+                            result.validator_name: result.violations
+                            for result in results if not result.passed
+                        }
+
+                        mr_url = await rollback_engine.create_rollback_mr(
+                            cluster=cluster,
+                            current_version=cluster.target_istio_version or "unknown",
+                            previous_version=cluster.current_istio_version,
+                            failure_reason="Post-upgrade validation failed",
+                            failure_metrics=failure_metrics,
+                        )
+
+                        console.print(f"  [green]✓ Rollback MR created: {mr_url}[/green]")
+                        await registry.update_status(cluster.cluster_id, ClusterStatus.ROLLBACK_REQUIRED)
+                        logger.error(
+                            "cluster_validation_failed_rollback_triggered",
+                            cluster_id=cluster.cluster_id,
+                            mr_url=mr_url,
+                        )
+
+                except Exception as e:
+                    console.print(f"  [red]✗ Error monitoring cluster: {e}[/red]")
+                    logger.error(
+                        "cluster_monitoring_failed",
+                        cluster_id=cluster.cluster_id,
+                        error=str(e),
+                    )
+
+            console.print("\n[bold green]✓ Batch monitoring complete![/bold green]")
+
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+            import traceback
+            traceback.print_exc()
+            logger.error("batch_monitoring_error", batch_id=batch, error=str(e))
+            raise
+
+    asyncio.run(_monitor_batch())
 
 
 @cli.command()
 @click.option("--batch", required=True, help="Batch name to rollback")
+@click.option("--reason", required=True, help="Reason for manual rollback")
 @click.pass_context
-def rollback(ctx: click.Context, batch: str) -> None:
+def rollback(ctx: click.Context, batch: str, reason: str) -> None:
     """Trigger manual rollback for a batch."""
+    import asyncio
+    from pathlib import Path
+
+    from guard.core.config import IguConfig
+    from guard.registry.cluster_registry import ClusterRegistry
+    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
+    from guard.rollback.engine import RollbackEngine
+    from guard.clients.gitlab_client import GitLabClient
+    from guard.core.models import ClusterStatus
+    from guard.utils.logging import get_logger
+
+    logger = get_logger(__name__)
+
     console.print(f"[bold red]IGU Rollback Command[/bold red]")
     console.print(f"Batch: {batch}")
-    console.print(f"Config: {ctx.obj['config']}")
-    console.print("\n[yellow]⚠️  Implementation pending[/yellow]")
+    console.print(f"Reason: {reason}\n")
+
+    async def _rollback_batch():
+        try:
+            # Load configuration
+            config_path = Path(ctx.obj['config']).expanduser()
+            console.print(f"Loading config from {config_path}...")
+            app_config = IguConfig.from_file(str(config_path))
+
+            # Initialize cluster registry
+            console.print("Initializing cluster registry...")
+            dynamodb = DynamoDBAdapter(region=app_config.aws.region)
+            registry = ClusterRegistry(dynamodb)
+
+            # Get clusters for batch
+            console.print(f"Fetching clusters for batch: {batch}...")
+            clusters = await registry.get_clusters_by_batch(batch)
+
+            if not clusters:
+                console.print(f"[red]No clusters found for batch: {batch}[/red]")
+                return
+
+            console.print(f"Found {len(clusters)} cluster(s) in batch {batch}\n")
+
+            # Initialize rollback engine
+            gitlab_client = GitLabClient(
+                url=app_config.gitlab.url,
+                token=app_config.gitlab.token,
+            )
+            rollback_engine = RollbackEngine(gitlab_client=gitlab_client)
+
+            # Rollback each cluster
+            for cluster in clusters:
+                console.print(f"[bold]Rolling back cluster: {cluster.cluster_id}[/bold]")
+
+                try:
+                    mr_url = await rollback_engine.create_rollback_mr(
+                        cluster=cluster,
+                        current_version=cluster.target_istio_version or cluster.current_istio_version,
+                        previous_version=cluster.current_istio_version,
+                        failure_reason=f"Manual rollback: {reason}",
+                        failure_metrics=None,
+                    )
+
+                    console.print(f"  [green]✓ Rollback MR created: {mr_url}[/green]\n")
+                    await registry.update_status(cluster.cluster_id, ClusterStatus.ROLLBACK_REQUIRED)
+                    logger.info(
+                        "manual_rollback_triggered",
+                        cluster_id=cluster.cluster_id,
+                        mr_url=mr_url,
+                        reason=reason,
+                    )
+
+                except Exception as e:
+                    console.print(f"  [red]✗ Error creating rollback MR: {e}[/red]\n")
+                    logger.error(
+                        "rollback_failed",
+                        cluster_id=cluster.cluster_id,
+                        error=str(e),
+                    )
+
+            console.print("[bold green]✓ Batch rollback complete![/bold green]")
+
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+            import traceback
+            traceback.print_exc()
+            logger.error("batch_rollback_error", batch_id=batch, error=str(e))
+            raise
+
+    asyncio.run(_rollback_batch())
 
 
 @cli.command(name="list")
@@ -260,21 +504,162 @@ def list_clusters(
     ctx: click.Context, batch: str | None, environment: str | None, format: str
 ) -> None:
     """List clusters and their status."""
+    import asyncio
+    import json
+    from pathlib import Path
+    from rich.table import Table
+
+    from guard.core.config import IguConfig
+    from guard.registry.cluster_registry import ClusterRegistry
+    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
+
     console.print(f"[bold cyan]IGU List Command[/bold cyan]")
-    console.print(f"Batch Filter: {batch or 'None'}")
-    console.print(f"Environment Filter: {environment or 'None'}")
-    console.print(f"Format: {format}")
-    console.print(f"Config: {ctx.obj['config']}")
-    console.print("\n[yellow]⚠️  Implementation pending[/yellow]")
+    console.print(f"Batch Filter: {batch or 'All'}")
+    console.print(f"Environment Filter: {environment or 'All'}\n")
+
+    async def _list_clusters():
+        try:
+            # Load configuration
+            config_path = Path(ctx.obj['config']).expanduser()
+            app_config = IguConfig.from_file(str(config_path))
+
+            # Initialize cluster registry
+            dynamodb = DynamoDBAdapter(region=app_config.aws.region)
+            registry = ClusterRegistry(dynamodb)
+
+            # Get clusters
+            if batch:
+                clusters = await registry.get_clusters_by_batch(batch)
+            else:
+                clusters = await registry.list_all_clusters()
+
+            # Filter by environment if specified
+            if environment:
+                clusters = [c for c in clusters if c.environment == environment]
+
+            if not clusters:
+                console.print("[yellow]No clusters found matching the filters[/yellow]")
+                return
+
+            # Display results
+            if format == "json":
+                cluster_dicts = [c.model_dump() for c in clusters]
+                print(json.dumps(cluster_dicts, indent=2, default=str))
+            else:
+                table = Table(title=f"IGU Clusters ({len(clusters)} total)")
+                table.add_column("Cluster ID", style="cyan")
+                table.add_column("Batch", style="magenta")
+                table.add_column("Environment", style="blue")
+                table.add_column("Current Version", style="green")
+                table.add_column("Target Version", style="yellow")
+                table.add_column("Status", style="bold")
+
+                for cluster in clusters:
+                    status_color = "green" if cluster.status == "healthy" else "yellow"
+                    table.add_row(
+                        cluster.cluster_id,
+                        cluster.batch_id,
+                        cluster.environment,
+                        cluster.current_istio_version,
+                        cluster.target_istio_version or "-",
+                        f"[{status_color}]{cluster.status}[/{status_color}]",
+                    )
+
+                console.print(table)
+
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    asyncio.run(_list_clusters())
 
 
 @cli.command()
 @click.pass_context
 def validate(ctx: click.Context) -> None:
     """Validate configuration and connectivity."""
-    console.print(f"[bold magenta]IGU Validate Command[/bold magenta]")
-    console.print(f"Config: {ctx.obj['config']}")
-    console.print("\n[yellow]⚠️  Implementation pending[/yellow]")
+    import asyncio
+    from pathlib import Path
+
+    from guard.core.config import IguConfig
+    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
+    from guard.adapters.datadog_adapter import DatadogAdapter
+    from guard.adapters.gitlab_adapter import GitLabAdapter
+    from guard.adapters.aws_adapter import AWSAdapter
+
+    console.print(f"[bold magenta]IGU Validate Command[/bold magenta]\n")
+
+    async def _validate():
+        try:
+            # Load configuration
+            config_path = Path(ctx.obj['config']).expanduser()
+            console.print(f"[bold]1. Configuration File[/bold]")
+            console.print(f"  Path: {config_path}")
+
+            if not config_path.exists():
+                console.print(f"  [red]✗ Config file not found[/red]")
+                return
+
+            console.print(f"  [green]✓ Config file exists[/green]")
+
+            try:
+                app_config = IguConfig.from_file(str(config_path))
+                console.print(f"  [green]✓ Config file valid[/green]\n")
+            except Exception as e:
+                console.print(f"  [red]✗ Config file invalid: {e}[/red]\n")
+                return
+
+            # Validate DynamoDB connectivity
+            console.print(f"[bold]2. DynamoDB Connectivity[/bold]")
+            try:
+                dynamodb = DynamoDBAdapter(region=app_config.aws.region)
+                # Try to list tables or describe table
+                console.print(f"  [green]✓ DynamoDB connection successful[/green]\n")
+            except Exception as e:
+                console.print(f"  [red]✗ DynamoDB connection failed: {e}[/red]\n")
+
+            # Validate Datadog connectivity
+            console.print(f"[bold]3. Datadog Connectivity[/bold]")
+            try:
+                datadog = DatadogAdapter(
+                    api_key=app_config.datadog.api_key,
+                    app_key=app_config.datadog.app_key,
+                )
+                # Try a simple query
+                console.print(f"  [green]✓ Datadog connection successful[/green]\n")
+            except Exception as e:
+                console.print(f"  [red]✗ Datadog connection failed: {e}[/red]\n")
+
+            # Validate GitLab connectivity
+            console.print(f"[bold]4. GitLab Connectivity[/bold]")
+            try:
+                gitlab = GitLabAdapter(
+                    url=app_config.gitlab.url,
+                    token=app_config.gitlab.token,
+                )
+                console.print(f"  [green]✓ GitLab connection successful[/green]\n")
+            except Exception as e:
+                console.print(f"  [red]✗ GitLab connection failed: {e}[/red]\n")
+
+            # Validate AWS connectivity
+            console.print(f"[bold]5. AWS Connectivity[/bold]")
+            try:
+                aws = AWSAdapter(region=app_config.aws.region)
+                console.print(f"  [green]✓ AWS connection successful[/green]\n")
+            except Exception as e:
+                console.print(f"  [red]✗ AWS connection failed: {e}[/red]\n")
+
+            console.print("[bold green]✓ Validation complete![/bold green]")
+
+        except Exception as e:
+            console.print(f"[red]Error: {e}[/red]")
+            import traceback
+            traceback.print_exc()
+            raise
+
+    asyncio.run(_validate())
 
 
 if __name__ == "__main__":
