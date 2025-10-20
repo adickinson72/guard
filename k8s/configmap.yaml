@@ -1,0 +1,17 @@
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: igu-config
+  namespace: guard-system
+  labels:
+    app.kubernetes.io/name: guard
+    app.kubernetes.io/component: automation
+data:
+  # Add your IGU configuration here
+  # Example:
+  # config.yaml: |
+  #   clusters:
+  #     - cluster_id: "prod-us-east-1"
+  #       environment: "production"
+  #       ...

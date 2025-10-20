@@ -1,0 +1,9 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: guard-system
+  labels:
+    name: guard-system
+    app.kubernetes.io/name: guard
+    app.kubernetes.io/component: automation

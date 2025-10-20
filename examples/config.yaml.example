@@ -1,0 +1,70 @@
+# IGU Configuration File Example
+
+# AWS Settings
+aws:
+  region: us-east-1
+  profile: default  # Optional: AWS profile to use
+  dynamodb:
+    table_name: igu-cluster-registry
+    region: us-east-1
+  secrets_manager:
+    gitlab_token_secret: igu/gitlab-token
+    datadog_credentials_secret: igu/datadog-credentials
+
+# GitLab Settings
+gitlab:
+  url: https://gitlab.company.com
+  default_target_branch: main
+
+# Datadog Settings
+datadog:
+  site: datadoghq.com
+
+# Validation Settings
+validation:
+  soak_period_minutes: 60
+  flux_sync_timeout_minutes: 15
+  thresholds:
+    latency_increase_percent: 10
+    error_rate_max: 0.001
+    resource_increase_percent: 50
+
+# Rollback Settings
+rollback:
+  auto_create_mr: true
+  require_manual_approval: true
+  notification:
+    enabled: true
+    webhook_url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+
+# LLM Settings (Optional)
+llm:
+  enabled: false
+  provider: openai
+  model: gpt-4
+  api_key_secret: igu/llm-api-key
+
+# Batch Configuration
+batches:
+  - name: test
+    description: Test cluster
+    clusters:
+      - eks-test-us-east-1
+
+  - name: dev-wave-1
+    description: Development clusters - first wave
+    clusters:
+      - eks-dev-us-east-1-app1
+      - eks-dev-us-east-1-app2
+
+  - name: prod-wave-1
+    description: Production - Critical services
+    clusters:
+      - eks-prod-us-east-1-api
+      - eks-prod-us-east-1-web
+
+# Logging
+logging:
+  level: INFO
+  format: json
+  output: stdout

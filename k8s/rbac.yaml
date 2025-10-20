@@ -1,0 +1,61 @@
+---
+# ClusterRole for IGU to manage Istio upgrades across the cluster
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: igu-manager
+  labels:
+    app.kubernetes.io/name: guard
+    app.kubernetes.io/component: automation
+rules:
+# Namespace management
+- apiGroups: [""]
+  resources: ["namespaces"]
+  verbs: ["get", "list", "watch"]
+
+# Pod and workload management
+- apiGroups: [""]
+  resources: ["pods", "pods/exec"]
+  verbs: ["get", "list", "watch", "create"]
+
+- apiGroups: ["apps"]
+  resources: ["deployments", "statefulsets", "daemonsets"]
+  verbs: ["get", "list", "watch", "patch"]
+
+# Node information
+- apiGroups: [""]
+  resources: ["nodes"]
+  verbs: ["get", "list", "watch"]
+
+# Webhook configurations (for Istio validation)
+- apiGroups: ["admissionregistration.k8s.io"]
+  resources: ["validatingwebhookconfigurations", "mutatingwebhookconfigurations"]
+  verbs: ["get", "list", "watch"]
+
+# Flux CD - HelmRelease resources (for checking Flux sync status)
+- apiGroups: ["helm.toolkit.fluxcd.io"]
+  resources: ["helmreleases"]
+  verbs: ["get", "list", "watch"]
+
+# Flux CD - Kustomization resources
+- apiGroups: ["kustomize.toolkit.fluxcd.io"]
+  resources: ["kustomizations"]
+  verbs: ["get", "list", "watch"]
+
+---
+# ClusterRoleBinding to bind the ClusterRole to the ServiceAccount
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: igu-manager-binding
+  labels:
+    app.kubernetes.io/name: guard
+    app.kubernetes.io/component: automation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: igu-manager
+subjects:
+- kind: ServiceAccount
+  name: guard
+  namespace: guard-system

@@ -1,0 +1,46 @@
+{
+  "_comment": "Upgrade Specification Example (JSON)",
+  "_usage": "igu run --batch prod-wave-1 --upgrade-spec upgrade-spec.json",
+  "_important_fail_fast_behavior": [
+    "All paths MUST exist in the target HelmRelease file",
+    "If a path doesn't exist, the upgrade will FAIL immediately",
+    "This prevents accidental configuration corruption from typos",
+    "Example: 'spec.chart.speck.version' (typo) will FAIL instead of silently creating a wrong field",
+    "To create new fields, ensure the parent path exists first"
+  ],
+  "version": "1.20.0",
+  "updates": [
+    {
+      "path": "spec.chart.spec.version",
+      "value": "1.20.0"
+    },
+    {
+      "path": "spec.values.global.tag",
+      "value": "1.20.0"
+    },
+    {
+      "path": "spec.values.pilot.autoscaleEnabled",
+      "value": true
+    },
+    {
+      "path": "spec.values.pilot.autoscaleMin",
+      "value": 2
+    },
+    {
+      "path": "spec.values.pilot.autoscaleMax",
+      "value": 5
+    },
+    {
+      "path": "spec.values.pilot.resources.requests.cpu",
+      "value": "500m"
+    },
+    {
+      "path": "spec.values.pilot.resources.requests.memory",
+      "value": "512Mi"
+    },
+    {
+      "path": "spec.values.meshConfig.defaultConfig.tracing.zipkin.address",
+      "value": "zipkin.istio-system:9411"
+    }
+  ]
+}

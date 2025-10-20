@@ -1,0 +1,78 @@
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: igu-scheduled-upgrade
+  namespace: guard-system
+  labels:
+    app.kubernetes.io/name: guard
+    app.kubernetes.io/component: automation
+spec:
+  # Weekly on Sunday at 2 AM UTC
+  schedule: "0 2 * * 0"
+  # Keep last 3 successful and 1 failed job
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      # Set timeout for job (4 hours)
+      activeDeadlineSeconds: 14400
+      # Automatically delete completed jobs after 24 hours
+      ttlSecondsAfterFinished: 86400
+      backoffLimit: 0
+      template:
+        metadata:
+          labels:
+            app.kubernetes.io/name: guard
+            app.kubernetes.io/component: automation
+        spec:
+          serviceAccountName: igu
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            fsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+          - name: guard
+            # Replace with your container registry and image tag
+            image: <YOUR_REGISTRY>/igu:latest
+            imagePullPolicy: Always
+            # Example command - adjust based on your requirements
+            command: ["igu"]
+            args:
+            - "run"
+            - "--batch"
+            - "dev-wave-1"
+            - "--target-version"
+            - "1.20.0"
+            env:
+            - name: IGU_CONFIG_PATH
+              value: /app/config/config.yaml
+            - name: AWS_REGION
+              value: us-east-1
+            - name: AWS_DEFAULT_REGION
+              value: us-east-1
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "100m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                - ALL
+            volumeMounts:
+            - name: config
+              mountPath: /app/config
+              readOnly: true
+          volumes:
+          - name: config
+            configMap:
+              name: igu-config
+          restartPolicy: Never
