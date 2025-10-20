@@ -99,11 +99,11 @@ Managing Istio upgrades across 75+ EKS clusters is complex and risky. GUARD auto
 
 ```bash
 # Install GUARD
-pip install igu
+pip install guard
 
 # Or install from source
-git clone https://github.com/your-org/igu.git
-cd igu
+git clone https://github.com/adickinson72/guard.git
+cd guard
 pip install -e .
 ```
 
@@ -113,14 +113,14 @@ For production environments, run GUARD inside an EKS pod to leverage Pod Identit
 
 ```bash
 # Build and push Docker image
-docker build -t <YOUR_REGISTRY>/igu:latest .
-docker push <YOUR_REGISTRY>/igu:latest
+docker build -t <YOUR_REGISTRY>/guard:latest .
+docker push <YOUR_REGISTRY>/guard:latest
 
 # Deploy to Kubernetes
 kubectl apply -k k8s/
 
 # Execute upgrades
-kubectl exec -n igu-system deploy/igu -- igu run --batch prod-wave-1 --target-version 1.20.0
+kubectl exec -n guard-system deploy/guard -- guard run --batch prod-wave-1 --target-version 1.20.0
 ```
 
 See [Kubernetes Deployment Guide](docs/kubernetes-deployment.md) for complete instructions.
@@ -138,12 +138,12 @@ See [Kubernetes Deployment Guide](docs/kubernetes-deployment.md) for complete in
 ```bash
 # GitLab token
 aws secretsmanager create-secret \
-    --name igu/gitlab-token \
+    --name guard/gitlab-token \
     --secret-string "glpat-xxxxxxxxxxxx"
 
 # Datadog credentials
 aws secretsmanager create-secret \
-    --name igu/datadog-credentials \
+    --name guard/datadog-credentials \
     --secret-string '{"api_key":"xxx","app_key":"xxx"}'
 ```
 
@@ -161,53 +161,53 @@ cp examples/config.yaml.example ~/.guard/config.yaml
 
 ```bash
 # Validate configuration
-igu validate --config ~/.guard/config.yaml
+guard validate --config ~/.guard/config.yaml
 
 # List clusters and their status
-igu list --batch prod-wave-1
+guard list --batch prod-wave-1
 
 # Run pre-checks and create upgrade MR
-igu run --batch prod-wave-1 --target-version 1.20.0
+guard run --batch prod-wave-1 --target-version 1.20.0
 
 # After MR is merged, monitor upgrade and validate
-igu monitor --batch prod-wave-1 --soak-period 60
+guard monitor --batch prod-wave-1 --soak-period 60
 
 # If needed, trigger manual rollback
-igu rollback --batch prod-wave-1
+guard rollback --batch prod-wave-1
 ```
 
 ### Complete Upgrade Workflow
 
 ```bash
 # 1. Test cluster first
-igu run --batch test --target-version 1.20.0
+guard run --batch test --target-version 1.20.0
 # → Review and merge MR in GitLab
-igu monitor --batch test
+guard monitor --batch test
 
 # 2. Development clusters (wave 1)
-igu run --batch dev-wave-1 --target-version 1.20.0
+guard run --batch dev-wave-1 --target-version 1.20.0
 # → Review and merge MR
-igu monitor --batch dev-wave-1
+guard monitor --batch dev-wave-1
 
 # 3. Development clusters (wave 2)
-igu run --batch dev-wave-2 --target-version 1.20.0
+guard run --batch dev-wave-2 --target-version 1.20.0
 # → Review and merge MR
-igu monitor --batch dev-wave-2
+guard monitor --batch dev-wave-2
 
 # 4. Staging clusters
-igu run --batch staging --target-version 1.20.0
+guard run --batch staging --target-version 1.20.0
 # → Review and merge MR
-igu monitor --batch staging --soak-period 120  # Extended soak
+guard monitor --batch staging --soak-period 120  # Extended soak
 
 # 5. Production (critical services)
-igu run --batch prod-wave-1 --target-version 1.20.0
+guard run --batch prod-wave-1 --target-version 1.20.0
 # → Review and merge MR (notify on-call team)
-igu monitor --batch prod-wave-1 --soak-period 120
+guard monitor --batch prod-wave-1 --soak-period 120
 
 # 6. Production (remaining)
-igu run --batch prod-wave-2 --target-version 1.20.0
+guard run --batch prod-wave-2 --target-version 1.20.0
 # → Review and merge MR
-igu monitor --batch prod-wave-2
+guard monitor --batch prod-wave-2
 ```
 
 ---
@@ -264,7 +264,7 @@ GUARD is built with **Test-Driven Development (TDD)** principles:
 pytest
 
 # Run with coverage
-pytest --cov=igu --cov-report=html
+pytest --cov=guard --cov-report=html
 
 # Run specific test types
 pytest tests/unit/           # Unit tests only
@@ -314,7 +314,7 @@ Example:
 ```python
 # tests/unit/test_cluster_registry.py
 import pytest
-from igu.registry.cluster_registry import ClusterRegistry
+from guard.registry.cluster_registry import ClusterRegistry
 
 def test_get_clusters_by_batch_returns_correct_clusters(mock_dynamodb):
     """Test that clusters are correctly filtered by batch_id."""
@@ -366,8 +366,8 @@ See [Testing Guide](docs/testing.md) for detailed testing practices.
 
 ```bash
 # Clone repository
-git clone https://github.com/your-org/igu.git
-cd igu
+git clone https://github.com/adickinson72/guard.git
+cd guard
 
 # Install Poetry (if not already installed)
 curl -sSL https://install.python-poetry.org | python3 -
@@ -389,8 +389,8 @@ poetry run mypy src/
 ### Project Structure
 
 ```
-igu/
-├── src/igu/                 # Source code
+guard/
+├── src/guard/               # Source code
 │   ├── cli/                 # CLI commands
 │   ├── core/                # Core models and config
 │   ├── registry/            # Cluster registry
@@ -499,9 +499,9 @@ We welcome contributions! Please see [CONTRIBUTING.md](docs/contributing.md) for
 
 ### Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/your-org/igu/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/your-org/igu/discussions)
-- **Slack**: #igu-support
+- **Issues**: [GitHub Issues](https://github.com/adickinson72/guard/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/adickinson72/guard/discussions)
+- **Slack**: #guard-support
 
 ---
 
@@ -534,6 +534,6 @@ Special thanks to:
 
 <div align="center">
 
-**[⬆ back to top](#istio-gitops-upgrader-igu)**
+**[⬆ back to top](#gitops-upgrade-automation-with-rollback-detection)**
 
 </div>
