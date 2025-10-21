@@ -4,7 +4,6 @@ Tests the GitLab adapter implementation of GitOpsProvider interface.
 All GitLab API calls are mocked to ensure tests are isolated and fast.
 """
 
-from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -26,7 +25,9 @@ class TestGitLabAdapterInit:
 
         adapter = GitLabAdapter(url="https://gitlab.com", token="test-token")
 
-        mock_gitlab_client_class.assert_called_once_with(url="https://gitlab.com", token="test-token")
+        mock_gitlab_client_class.assert_called_once_with(
+            url="https://gitlab.com", token="test-token"
+        )
         assert adapter.client == mock_client
 
     @patch("guard.adapters.gitlab_adapter.GitLabClient")
@@ -58,15 +59,11 @@ class TestGitLabAdapterCreateBranch:
         adapter = GitLabAdapter(url="https://gitlab.com", token="test-token")
 
         result = await adapter.create_branch(
-            project_id="infra/k8s-clusters",
-            branch_name="feature/istio-1.20.0-test",
-            ref="main"
+            project_id="infra/k8s-clusters", branch_name="feature/istio-1.20.0-test", ref="main"
         )
 
         mock_client.create_branch.assert_called_once_with(
-            "infra/k8s-clusters",
-            "feature/istio-1.20.0-test",
-            "main"
+            "infra/k8s-clusters", "feature/istio-1.20.0-test", "main"
         )
         assert result == "feature/istio-1.20.0-test"
 
@@ -83,9 +80,7 @@ class TestGitLabAdapterCreateBranch:
         adapter = GitLabAdapter(url="https://gitlab.com", token="test-token")
 
         result = await adapter.create_branch(
-            project_id="123",
-            branch_name="hotfix/urgent-fix",
-            ref="v1.19.0"
+            project_id="123", branch_name="hotfix/urgent-fix", ref="v1.19.0"
         )
 
         mock_client.create_branch.assert_called_once_with("123", "hotfix/urgent-fix", "v1.19.0")
@@ -102,11 +97,7 @@ class TestGitLabAdapterCreateBranch:
         adapter = GitLabAdapter(url="https://gitlab.com", token="test-token")
 
         with pytest.raises(GitOpsProviderError) as exc_info:
-            await adapter.create_branch(
-                project_id="123",
-                branch_name="existing-branch",
-                ref="main"
-            )
+            await adapter.create_branch(project_id="123", branch_name="existing-branch", ref="main")
 
         assert "Failed to create branch" in str(exc_info.value)
 
@@ -125,15 +116,11 @@ class TestGitLabAdapterGetFileContent:
         adapter = GitLabAdapter(url="https://gitlab.com", token="test-token")
 
         result = await adapter.get_file_content(
-            project_id="123",
-            file_path="clusters/prod/istio-helmrelease.yaml",
-            ref="main"
+            project_id="123", file_path="clusters/prod/istio-helmrelease.yaml", ref="main"
         )
 
         mock_client.get_file.assert_called_once_with(
-            "123",
-            "clusters/prod/istio-helmrelease.yaml",
-            "main"
+            "123", "clusters/prod/istio-helmrelease.yaml", "main"
         )
         assert "apiVersion" in result
 
@@ -149,9 +136,7 @@ class TestGitLabAdapterGetFileContent:
 
         with pytest.raises(GitOpsProviderError) as exc_info:
             await adapter.get_file_content(
-                project_id="123",
-                file_path="nonexistent.yaml",
-                ref="main"
+                project_id="123", file_path="nonexistent.yaml", ref="main"
             )
 
         assert "Failed to get file" in str(exc_info.value)
@@ -174,15 +159,11 @@ class TestGitLabAdapterUpdateFile:
             file_path="config.yaml",
             content="updated: content",
             commit_message="Update config",
-            branch="feature/update-config"
+            branch="feature/update-config",
         )
 
         mock_client.update_file.assert_called_once_with(
-            "123",
-            "config.yaml",
-            "updated: content",
-            "Update config",
-            "feature/update-config"
+            "123", "config.yaml", "updated: content", "Update config", "feature/update-config"
         )
         assert result is True
 
@@ -202,7 +183,7 @@ class TestGitLabAdapterUpdateFile:
                 file_path="config.yaml",
                 content="content",
                 commit_message="Update",
-                branch="main"
+                branch="main",
             )
 
         assert "Failed to update file" in str(exc_info.value)
@@ -239,7 +220,7 @@ class TestGitLabAdapterCreateMergeRequest:
             title="Istio upgrade to v1.20.0",
             description="Automated upgrade",
             draft=True,
-            assignee_ids=[100]
+            assignee_ids=[100],
         )
 
         mock_client.create_merge_request.assert_called_once_with(
@@ -249,7 +230,7 @@ class TestGitLabAdapterCreateMergeRequest:
             "Istio upgrade to v1.20.0",
             "Automated upgrade",
             assignee_id=100,
-            draft=True
+            draft=True,
         )
 
         assert isinstance(result, MergeRequestInfo)
@@ -281,24 +262,18 @@ class TestGitLabAdapterCreateMergeRequest:
 
         adapter = GitLabAdapter(url="https://gitlab.com", token="test-token")
 
-        result = await adapter.create_merge_request(
+        await adapter.create_merge_request(
             project_id="123",
             source_branch="feature/test",
             target_branch="main",
             title="Test MR",
             description="Test",
-            draft=False
+            draft=False,
         )
 
         # Should pass assignee_id=None
         mock_client.create_merge_request.assert_called_once_with(
-            "123",
-            "feature/test",
-            "main",
-            "Test MR",
-            "Test",
-            assignee_id=None,
-            draft=False
+            "123", "feature/test", "main", "Test MR", "Test", assignee_id=None, draft=False
         )
 
     @pytest.mark.asyncio
@@ -317,7 +292,7 @@ class TestGitLabAdapterCreateMergeRequest:
                 source_branch="feature/test",
                 target_branch="main",
                 title="Test",
-                description="Test"
+                description="Test",
             )
 
         assert "Failed to create MR" in str(exc_info.value)
@@ -386,15 +361,11 @@ class TestGitLabAdapterAddMergeRequestComment:
         adapter = GitLabAdapter(url="https://gitlab.com", token="test-token")
 
         result = await adapter.add_merge_request_comment(
-            project_id="123",
-            mr_id=789,
-            comment="Validation passed successfully"
+            project_id="123", mr_id=789, comment="Validation passed successfully"
         )
 
         mock_client.add_mr_comment.assert_called_once_with(
-            "123",
-            789,
-            "Validation passed successfully"
+            "123", 789, "Validation passed successfully"
         )
         assert result is True
 
@@ -412,9 +383,7 @@ class TestGitLabAdapterAddMergeRequestComment:
 
         with pytest.raises(GitOpsProviderError) as exc_info:
             await adapter.add_merge_request_comment(
-                project_id="123",
-                mr_id=789,
-                comment="Test comment"
+                project_id="123", mr_id=789, comment="Test comment"
             )
 
         assert "Failed to add comment to MR" in str(exc_info.value)
@@ -455,8 +424,7 @@ class TestGitLabAdapterCheckBranchExists:
         adapter = GitLabAdapter(url="https://gitlab.com", token="test-token")
 
         result = await adapter.check_branch_exists(
-            project_id="123",
-            branch_name="nonexistent-branch"
+            project_id="123", branch_name="nonexistent-branch"
         )
 
         assert result is False

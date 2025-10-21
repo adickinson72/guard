@@ -1,9 +1,9 @@
 """Integration tests for Kubernetes client."""
 
 import os
+from pathlib import Path
 
 import pytest
-from kubernetes.client.exceptions import ApiException
 from kubernetes.config.config_exception import ConfigException
 
 from guard.clients.kubernetes_client import KubernetesClient
@@ -18,8 +18,8 @@ class TestKubernetesClientIntegration:
     def skip_if_no_kubeconfig(self):
         """Skip test if kubeconfig is not available."""
         # Check if kubeconfig exists or if we're in-cluster
-        kubeconfig_path = os.getenv("KUBECONFIG", os.path.expanduser("~/.kube/config"))
-        if not os.path.exists(kubeconfig_path):
+        kubeconfig_path = os.getenv("KUBECONFIG", Path("~/.kube/config").expanduser())
+        if not Path(kubeconfig_path).exists():
             pytest.skip(
                 "Kubeconfig not found. Set KUBECONFIG environment variable or "
                 "ensure ~/.kube/config exists."
@@ -161,8 +161,8 @@ class TestKubernetesClientIstioIntegration:
     @pytest.fixture
     def skip_if_no_kubeconfig(self):
         """Skip test if kubeconfig is not available."""
-        kubeconfig_path = os.getenv("KUBECONFIG", os.path.expanduser("~/.kube/config"))
-        if not os.path.exists(kubeconfig_path):
+        kubeconfig_path = os.getenv("KUBECONFIG", Path("~/.kube/config").expanduser())
+        if not Path(kubeconfig_path).exists():
             pytest.skip("Kubeconfig not found")
 
     @pytest.fixture
@@ -184,9 +184,7 @@ class TestKubernetesClientIstioIntegration:
         except Exception as e:
             pytest.skip(f"Failed to check for Istio installation: {e}")
 
-    def test_get_istio_pods(
-        self, k8s_client: KubernetesClient, skip_if_no_istio
-    ):
+    def test_get_istio_pods(self, k8s_client: KubernetesClient, skip_if_no_istio):
         """Test retrieving Istio control plane pods."""
         pods = k8s_client.get_pods(namespace="istio-system", label_selector="app=istiod")
 
@@ -196,9 +194,7 @@ class TestKubernetesClientIstioIntegration:
             assert hasattr(pod.metadata, "name")
             assert "istiod" in pod.metadata.name
 
-    def test_check_istio_pods_ready(
-        self, k8s_client: KubernetesClient, skip_if_no_istio
-    ):
+    def test_check_istio_pods_ready(self, k8s_client: KubernetesClient, skip_if_no_istio):
         """Test checking Istio pod readiness."""
         all_ready, unready_pods = k8s_client.check_pods_ready(
             namespace="istio-system", label_selector="app=istiod"
@@ -209,9 +205,7 @@ class TestKubernetesClientIstioIntegration:
 
         # Istio pods should be ready in a healthy cluster
         if not all_ready:
-            print(
-                f"Warning: {len(unready_pods)} Istio pods are not ready: {unready_pods}"
-            )
+            print(f"Warning: {len(unready_pods)} Istio pods are not ready: {unready_pods}")
 
     def test_get_namespaces_with_istio_injection(
         self, k8s_client: KubernetesClient, skip_if_no_istio

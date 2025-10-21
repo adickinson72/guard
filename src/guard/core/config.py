@@ -184,7 +184,7 @@ class GuardConfig(BaseModel):
             raise ConfigurationError(f"Configuration file not found: {config_path}")
 
         try:
-            with open(config_path) as f:
+            with config_path.open() as f:
                 data = yaml.safe_load(f)
         except Exception as e:
             raise ConfigurationError(f"Failed to load configuration: {e}") from e

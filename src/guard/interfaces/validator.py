@@ -28,7 +28,7 @@ class ValidationResult:
     validator_name: str
     passed: bool
     violations: list[str]
-    metrics: dict[str, float]
+    metrics: dict[str, float | None]
     timestamp: datetime
 
 

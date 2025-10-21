@@ -5,7 +5,7 @@ from pathlib import Path
 
 from guard.clients.gitlab_client import GitLabClient
 from guard.core.models import ClusterConfig
-from guard.gitops.updaters.istio_helm_updater import IstioHelmUpdater
+from guard.interfaces.config_updater import ConfigUpdater
 from guard.utils.logging import get_logger
 
 logger = get_logger(__name__)
@@ -14,13 +14,15 @@ logger = get_logger(__name__)
 class RollbackEngine:
     """Engine for automated rollback operations."""
 
-    def __init__(self, gitlab_client: GitLabClient):
+    def __init__(self, gitlab_client: GitLabClient, config_updater: ConfigUpdater):
         """Initialize rollback engine.
 
         Args:
             gitlab_client: GitLab client instance
+            config_updater: Config updater for updating GitOps files
         """
         self.gitlab = gitlab_client
+        self.updater = config_updater
         logger.debug("rollback_engine_initialized")
 
     async def create_rollback_mr(
@@ -76,23 +78,22 @@ class RollbackEngine:
                 ref=branch_name,
             )
 
-            # Update Istio version to previous version
-            updater = IstioHelmUpdater()
+            # Update version to previous version using injected updater
             config_file = Path(f"/tmp/rollback_{timestamp}.yaml")
 
             # Write current content to temp file
-            with open(config_file, "w") as f:
+            with config_file.open("w") as f:
                 f.write(file_content)
 
             # Update version
-            await updater.update_version(
+            await self.updater.update_version(
                 file_path=config_file,
                 target_version=previous_version,
                 backup=False,
             )
 
             # Read updated content
-            with open(config_file) as f:
+            with config_file.open() as f:
                 updated_content = f.read()
 
             # Clean up temp file
@@ -146,7 +147,7 @@ This is an **emergency rollback** MR. Please review and merge as soon as possibl
 """
 
             logger.debug("creating_rollback_mr")
-            mr_url = self.gitlab.create_merge_request(
+            mr = self.gitlab.create_merge_request(
                 project_id=project_id,
                 source_branch=branch_name,
                 target_branch="main",
@@ -154,6 +155,9 @@ This is an **emergency rollback** MR. Please review and merge as soon as possibl
                 description=mr_description,
                 draft=False,  # Rollback MRs should not be draft
             )
+
+            # Extract web URL from MR object
+            mr_url: str = mr.web_url
 
             logger.info(
                 "rollback_mr_created_successfully",

@@ -13,10 +13,10 @@ Running GUARD inside an EKS pod provides several benefits:
 
 ## Prerequisites
 
-- EKS cluster with OIDC provider confguardred
+- EKS cluster with OIDC provider configured
 - IAM role with cross-account assume role permissions
 - Container registry for storing GUARD Docker image
-- `kubectl` confguardred for your management cluster
+- `kubectl` configured for your management cluster
 
 ## Architecture
 
@@ -39,7 +39,7 @@ docker build -t <YOUR_REGISTRY>/guard:latest .
 docker push <YOUR_REGISTRY>/guard:latest
 ```
 
-### 2. Confguardre IAM Role
+### 2. Configure IAM Role
 
 Create an IAM role with the following trust policy:
 
@@ -137,7 +137,7 @@ kubectl exec -n guard-system deploy/guard -- guard run --batch dev-wave-1 --targ
 
 ### Scheduled Execution (CronJob)
 
-The CronJob manifest (`k8s/cronjob.yaml`) is confguardred to run weekly on Sunday at 2 AM UTC.
+The CronJob manifest (`k8s/cronjob.yaml`) is configured to run weekly on Sunday at 2 AM UTC.
 
 To customize the schedule, edit the `spec.schedule` field using cron syntax:
 
@@ -169,11 +169,11 @@ kubectl logs -n guard-system job/guard-scheduled-upgrade-<timestamp> -f
 kubectl get jobs -n guard-system
 ```
 
-## Confguardration
+## Configuration
 
 ### ConfigMap
 
-Store GUARD confguardration in the ConfigMap (`k8s/configmap.yaml`):
+Store GUARD configuration in the ConfigMap (`k8s/configmap.yaml`):
 
 ```yaml
 data:
@@ -183,7 +183,7 @@ data:
         batch_id: "prod-wave-1"
         environment: "production"
         region: "us-east-1"
-        # ... other confguardration
+        # ... other configuration
 ```
 
 After updating, apply the changes:
@@ -222,7 +222,7 @@ After a successful Istio control plane upgrade:
 3. Restarts each workload using a rolling restart strategy (adds `kubectl.kubernetes.io/restartedAt` annotation)
 4. Kubernetes performs a rolling update, replacing pods with new sidecar versions
 
-### Confguardration
+### Configuration
 
 The restart functionality is enabled by default. To disable:
 
@@ -341,7 +341,7 @@ spec:
 
 To manage multiple EKS clusters, deploy GUARD in a central "management" cluster:
 
-1. Confguardre the management cluster's IAM role to assume roles in all target clusters
+1. Configure the management cluster's IAM role to assume roles in all target clusters
 2. Store kubeconfig contexts for all clusters in a ConfigMap or Secret
 3. Use the appropriate context when initializing KubernetesClient:
 

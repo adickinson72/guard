@@ -44,6 +44,7 @@ repos:
       # File checks
       - id: check-yaml
         name: check yaml syntax
+        args: [--allow-multiple-documents]
       - id: check-json
         name: check json syntax
       - id: check-toml

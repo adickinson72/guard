@@ -70,9 +70,7 @@ class TestGitLabClientIntegration:
         # Should return a list (may be empty)
         assert isinstance(mrs, list)
 
-    def test_get_file_from_main_branch(
-        self, gitlab_client: GitLabClient, test_project_id: str
-    ):
+    def test_get_file_from_main_branch(self, gitlab_client: GitLabClient, test_project_id: str):
         """Test retrieving a file from the main branch."""
         # Try to get README or any common file
         file_paths_to_try = ["README.md", "README", ".gitignore", "LICENSE"]
@@ -159,9 +157,7 @@ class TestGitLabClientWriteOperations:
     def skip_if_write_not_allowed(self):
         """Skip test if write operations are not explicitly allowed."""
         if os.getenv("GITLAB_TEST_ALLOW_WRITE", "").lower() != "true":
-            pytest.skip(
-                "Write operations not allowed. Set GITLAB_TEST_ALLOW_WRITE=true to enable."
-            )
+            pytest.skip("Write operations not allowed. Set GITLAB_TEST_ALLOW_WRITE=true to enable.")
 
     def test_create_and_delete_branch(
         self,

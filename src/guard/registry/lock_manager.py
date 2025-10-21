@@ -119,7 +119,9 @@ class LockManager:
                             resource_id=resource_id,
                             reason="lock_held",
                         )
-                        raise LockAcquisitionError(f"Lock for {resource_id} is already held")
+                        raise LockAcquisitionError(
+                            f"Lock for {resource_id} is already held"
+                        ) from None
 
                     # Check if we've exceeded wait timeout
                     elapsed = time.time() - start_time
@@ -129,7 +131,9 @@ class LockManager:
                             resource_id=resource_id,
                             elapsed=elapsed,
                         )
-                        raise LockAcquisitionError(f"Timeout waiting for lock on {resource_id}")
+                        raise LockAcquisitionError(
+                            f"Timeout waiting for lock on {resource_id}"
+                        ) from None
 
                     # Wait and retry
                     logger.debug("waiting_for_lock", resource_id=resource_id)
@@ -177,7 +181,9 @@ class LockManager:
                     resource_id=resource_id,
                     reason="owner_mismatch",
                 )
-                raise LockAcquisitionError(f"Lock for {resource_id} is not held by {owner}")
+                raise LockAcquisitionError(
+                    f"Lock for {resource_id} is not held by {owner}"
+                ) from None
             else:
                 logger.error(
                     "lock_release_error",
@@ -210,7 +216,11 @@ class LockManager:
             lock_info = response["Item"]
 
             # Check if lock is expired
-            expiry_time = datetime.fromisoformat(lock_info["expiry_time"])
+            expiry_time_str = lock_info["expiry_time"]
+            if not isinstance(expiry_time_str, str):
+                logger.error("invalid_expiry_time_type", resource_id=resource_id)
+                raise AWSError("Invalid expiry_time type in lock record")
+            expiry_time = datetime.fromisoformat(expiry_time_str)
             if expiry_time < datetime.utcnow():
                 logger.debug("lock_expired", resource_id=resource_id)
                 # Clean up expired lock
@@ -282,7 +292,7 @@ class LockManager:
             if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
                 raise LockAcquisitionError(
                     f"Lock for {resource_id} is not held by {owner} or token mismatch"
-                )
+                ) from None
             else:
                 logger.error(
                     "lock_extension_error",

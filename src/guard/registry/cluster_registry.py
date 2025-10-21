@@ -201,28 +201,31 @@ class ClusterRegistry:
             update_parts = [
                 "#status = :new_status",
                 "last_updated = :timestamp",
-                "#version = #version + :one",
+                "#version = if_not_exists(#version, :zero) + :one",
             ]
             expr_attr_names = {"#status": "status", "#version": "version"}
             expr_attr_values = {
                 ":new_status": {"S": new_status},
                 ":expected_status": {"S": expected_status},
                 ":timestamp": {"S": datetime.utcnow().isoformat()},
+                ":zero": {"N": "0"},
                 ":one": {"N": "1"},
             }
 
             # Add additional fields with proper type marshalling
             for key, value in kwargs.items():
                 update_parts.append(f"{key} = :{key}")
-                # Handle different types properly
+                # Handle different types properly with explicit type annotations
+                attr_value: dict[str, Any]
                 if isinstance(value, bool):
-                    expr_attr_values[f":{key}"] = {"BOOL": value}
-                elif isinstance(value, (int, float)):
-                    expr_attr_values[f":{key}"] = {"N": str(value)}
+                    attr_value = {"BOOL": value}
+                elif isinstance(value, int | float):
+                    attr_value = {"N": str(value)}
                 elif value is None:
-                    expr_attr_values[f":{key}"] = {"NULL": True}
+                    attr_value = {"NULL": True}
                 else:
-                    expr_attr_values[f":{key}"] = {"S": str(value)}
+                    attr_value = {"S": str(value)}
+                expr_attr_values[f":{key}"] = attr_value
 
             self.dynamodb_client.transact_write_items(
                 TransactItems=[

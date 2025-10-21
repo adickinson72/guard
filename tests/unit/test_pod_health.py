@@ -159,10 +159,7 @@ class TestPodHealthCheckSuccess:
 
         assert result.passed is True
         # Message should mention the namespaces or indicate success
-        assert any(
-            ns in result.message
-            for ns in ["istio-system", "kube-system", "monitoring"]
-        )
+        assert any(ns in result.message for ns in ["istio-system", "kube-system", "monitoring"])
 
 
 class TestPodHealthCheckFailure:
@@ -194,6 +191,7 @@ class TestPodHealthCheckFailure:
         mock_context: CheckContext,
     ) -> None:
         """Test failure with unready pods across multiple namespaces."""
+
         # First two namespaces are fine, third has issues
         def check_pods_side_effect(namespace: str):
             if namespace == "monitoring":

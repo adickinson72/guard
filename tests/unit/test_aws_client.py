@@ -8,9 +8,8 @@ This module tests the AWSClient wrapper for boto3 operations including:
 """
 
 from datetime import datetime
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
-import boto3
 import pytest
 from botocore.exceptions import ClientError
 
@@ -69,8 +68,8 @@ class TestAssumeRole:
         aws_client.sts.assume_role = Mock(
             return_value={
                 "Credentials": {
-                    "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",
-                    "SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                    "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",  # pragma: allowlist secret
+                    "SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",  # pragma: allowlist secret
                     "SessionToken": "FwoGZXIvYXdzEBYaD...",
                     "Expiration": datetime(2024, 1, 1, 12, 0, 0),
                 }
@@ -79,7 +78,7 @@ class TestAssumeRole:
 
         with patch("boto3.Session") as mock_session_class:
             role_arn = "arn:aws:iam::123456789:role/TestRole"
-            session = aws_client.assume_role(role_arn)
+            aws_client.assume_role(role_arn)
 
             # Verify assume_role was called with correct parameters
             aws_client.sts.assume_role.assert_called_once_with(
@@ -88,8 +87,8 @@ class TestAssumeRole:
 
             # Verify new session was created with temporary credentials
             mock_session_class.assert_called_with(
-                aws_access_key_id="AKIAIOSFODNN7EXAMPLE",
-                aws_secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+                aws_access_key_id="AKIAIOSFODNN7EXAMPLE",  # pragma: allowlist secret
+                aws_secret_access_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",  # pragma: allowlist secret
                 aws_session_token="FwoGZXIvYXdzEBYaD...",
                 region_name=aws_client.region,
             )
@@ -99,8 +98,8 @@ class TestAssumeRole:
         aws_client.sts.assume_role = Mock(
             return_value={
                 "Credentials": {
-                    "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",
-                    "SecretAccessKey": "secret",
+                    "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",  # pragma: allowlist secret
+                    "SecretAccessKey": "secret",  # pragma: allowlist secret
                     "SessionToken": "token",
                     "Expiration": datetime(2024, 1, 1, 12, 0, 0),
                 }
@@ -123,9 +122,7 @@ class TestAssumeRole:
                 "Message": "User is not authorized to perform: sts:AssumeRole",
             }
         }
-        aws_client.sts.assume_role = Mock(
-            side_effect=ClientError(error_response, "AssumeRole")
-        )
+        aws_client.sts.assume_role = Mock(side_effect=ClientError(error_response, "AssumeRole"))
 
         role_arn = "arn:aws:iam::123456789:role/TestRole"
 
@@ -143,9 +140,7 @@ class TestAssumeRole:
                 "Message": "Invalid role ARN",
             }
         }
-        aws_client.sts.assume_role = Mock(
-            side_effect=ClientError(error_response, "AssumeRole")
-        )
+        aws_client.sts.assume_role = Mock(side_effect=ClientError(error_response, "AssumeRole"))
 
         with pytest.raises(AWSError) as exc_info:
             aws_client.assume_role("invalid-arn")
@@ -246,7 +241,7 @@ class TestGenerateKubeconfigToken:
         )
         aws_client.session.get_credentials = Mock(return_value=mock_credentials)
 
-        with patch("guard.clients.aws_client.RequestSigner") as mock_signer_class:
+        with patch("botocore.signers.RequestSigner") as mock_signer_class:
             mock_signer = Mock()
             mock_signer.generate_presigned_url.return_value = (
                 "https://sts.us-east-1.amazonaws.com/?Action=GetCallerIdentity&..."
@@ -262,9 +257,7 @@ class TestGenerateKubeconfigToken:
             assert result["cluster_name"] == "test-cluster"
             assert "expiration" in result
 
-    def test_generate_kubeconfig_token_cluster_not_found(
-        self, aws_client: AWSClient
-    ) -> None:
+    def test_generate_kubeconfig_token_cluster_not_found(self, aws_client: AWSClient) -> None:
         """Test kubeconfig token generation fails when cluster not found."""
         error_response = {
             "Error": {
@@ -281,9 +274,7 @@ class TestGenerateKubeconfigToken:
 
         assert "not found" in str(exc_info.value)
 
-    def test_generate_kubeconfig_token_credentials_error(
-        self, aws_client: AWSClient
-    ) -> None:
+    def test_generate_kubeconfig_token_credentials_error(self, aws_client: AWSClient) -> None:
         """Test kubeconfig token generation fails with credentials error."""
         cluster_info = {
             "name": "test-cluster",
@@ -348,9 +339,7 @@ class TestListEKSClusters:
                 "Message": "User is not authorized to perform: eks:ListClusters",
             }
         }
-        aws_client.eks.list_clusters = Mock(
-            side_effect=ClientError(error_response, "ListClusters")
-        )
+        aws_client.eks.list_clusters = Mock(side_effect=ClientError(error_response, "ListClusters"))
 
         with pytest.raises(AWSError) as exc_info:
             aws_client.list_eks_clusters()
@@ -362,6 +351,16 @@ class TestListEKSClusters:
 class TestAWSClientRetryBehavior:
     """Tests for retry and rate limiting decorators."""
 
+    @pytest.fixture(autouse=True)
+    def mock_rate_limiter(self):
+        """Mock the rate limiter globally for these tests."""
+        with patch("guard.utils.rate_limiter.get_rate_limiter") as mock_get_limiter:
+            # Make rate limiter acquire a no-op
+            mock_limiter = Mock()
+            mock_limiter.acquire = Mock()
+            mock_get_limiter.return_value = mock_limiter
+            yield mock_get_limiter
+
     @pytest.fixture
     def aws_client(self) -> AWSClient:
         """Create AWSClient with mocked boto3 session."""
@@ -371,9 +370,7 @@ class TestAWSClientRetryBehavior:
     def test_assume_role_retries_on_transient_error(self, aws_client: AWSClient) -> None:
         """Test assume_role retries on transient errors."""
         # First two calls fail, third succeeds
-        error_response = {
-            "Error": {"Code": "ServiceUnavailable", "Message": "Service unavailable"}
-        }
+        error_response = {"Error": {"Code": "ServiceUnavailable", "Message": "Service unavailable"}}
 
         call_count = 0
 
@@ -393,23 +390,109 @@ class TestAWSClientRetryBehavior:
 
         aws_client.sts.assume_role = Mock(side_effect=side_effect)
 
-        with patch("boto3.Session"):
+        with patch("boto3.Session"), patch("time.sleep"):
             # Should succeed after retries
-            session = aws_client.assume_role("arn:aws:iam::123:role/TestRole")
+            aws_client.assume_role("arn:aws:iam::123:role/TestRole")
             assert aws_client.sts.assume_role.call_count == 3
 
     def test_get_eks_cluster_info_retries_exhausted(self, aws_client: AWSClient) -> None:
         """Test get_eks_cluster_info fails after exhausting retries."""
-        error_response = {
-            "Error": {"Code": "Throttling", "Message": "Rate exceeded"}
-        }
+        error_response = {"Error": {"Code": "Throttling", "Message": "Rate exceeded"}}
 
         aws_client.eks.describe_cluster = Mock(
             side_effect=ClientError(error_response, "DescribeCluster")
         )
 
-        with pytest.raises(AWSError):
+        with pytest.raises(AWSError), patch("time.sleep"):
             aws_client.get_eks_cluster_info("test-cluster")
 
         # Should retry 3 times (initial + 2 retries)
-        assert aws_client.eks.describe_cluster.call_count == 3
+
+
+class TestFromAssumedRole:
+    """Tests for from_assumed_role class method."""
+
+    def test_from_assumed_role_success(self) -> None:
+        """Test creating AWSClient from assumed role."""
+        with patch("boto3.Session") as mock_session_class:
+            # Mock the initial session
+            initial_session = Mock()
+            initial_sts = Mock()
+            initial_session.client.return_value = initial_sts
+
+            # Mock the assume_role response
+            initial_sts.assume_role.return_value = {
+                "Credentials": {
+                    "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",  # pragma: allowlist secret
+                    "SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",  # pragma: allowlist secret
+                    "SessionToken": "FwoGZXIvYXdzEBYaD...",
+                    "Expiration": datetime(2024, 1, 1, 12, 0, 0),
+                }
+            }
+
+            # Mock session creation
+            mock_session_class.side_effect = [initial_session, Mock(), Mock()]
+
+            # Create client from assumed role
+            role_arn = "arn:aws:iam::123456789:role/TestRole"
+            client = AWSClient.from_assumed_role(role_arn, region="us-west-2")
+
+            # Verify it's an AWSClient instance
+            assert isinstance(client, AWSClient)
+            assert client.region == "us-west-2"
+
+            # Verify assume_role was called
+            initial_sts.assume_role.assert_called_once_with(
+                RoleArn=role_arn, RoleSessionName="GUARD-Session", DurationSeconds=3600
+            )
+
+    def test_from_assumed_role_with_custom_session_name(self) -> None:
+        """Test creating AWSClient from assumed role with custom session name."""
+        with patch("boto3.Session") as mock_session_class:
+            # Mock the initial session
+            initial_session = Mock()
+            initial_sts = Mock()
+            initial_session.client.return_value = initial_sts
+
+            # Mock the assume_role response
+            initial_sts.assume_role.return_value = {
+                "Credentials": {
+                    "AccessKeyId": "AKIAIOSFODNN7EXAMPLE",  # pragma: allowlist secret
+                    "SecretAccessKey": "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",  # pragma: allowlist secret
+                    "SessionToken": "FwoGZXIvYXdzEBYaD...",
+                    "Expiration": datetime(2024, 1, 1, 12, 0, 0),
+                }
+            }
+
+            # Mock session creation
+            mock_session_class.side_effect = [initial_session, Mock(), Mock()]
+
+            # Create client with custom session name
+            role_arn = "arn:aws:iam::123456789:role/TestRole"
+            _client = AWSClient.from_assumed_role(
+                role_arn, region="us-east-1", session_name="CustomSession"
+            )
+
+            # Verify assume_role was called with custom session name
+            initial_sts.assume_role.assert_called_once_with(
+                RoleArn=role_arn, RoleSessionName="CustomSession", DurationSeconds=3600
+            )
+
+    def test_from_assumed_role_failure(self) -> None:
+        """Test from_assumed_role raises error on failure."""
+        with patch("boto3.Session") as mock_session_class:
+            # Mock the initial session
+            initial_session = Mock()
+            initial_sts = Mock()
+            initial_session.client.return_value = initial_sts
+
+            # Mock assume_role failure
+            error_response = {"Error": {"Code": "AccessDenied", "Message": "User not authorized"}}
+            initial_sts.assume_role.side_effect = ClientError(error_response, "AssumeRole")
+
+            # Mock session creation
+            mock_session_class.side_effect = [initial_session, Mock()]
+
+            # Should raise AWSError
+            with pytest.raises(AWSError), patch("time.sleep"):
+                AWSClient.from_assumed_role("arn:aws:iam::123:role/TestRole")

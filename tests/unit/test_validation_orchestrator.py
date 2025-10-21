@@ -5,7 +5,7 @@ All external dependencies are mocked to ensure tests are isolated and fast.
 """
 
 import asyncio
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -207,9 +207,7 @@ class TestValidationOrchestratorCaptureBaseline:
 
         mock_metrics_provider.query_scalar.side_effect = [100.0, 0.001, 1000.0]
 
-        snapshot = await orchestrator.capture_baseline(
-            cluster=sample_cluster_config, duration_minutes=10
-        )
+        await orchestrator.capture_baseline(cluster=sample_cluster_config, duration_minutes=10)
 
         # Should query each unique metric only once
         assert mock_metrics_provider.query_scalar.call_count == 3

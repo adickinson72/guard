@@ -180,7 +180,7 @@ Based on the collected metrics and logs, the likely root cause is:
 
 2. Or upgrade application to handle shorter timeouts
 
-3. Re-validate after confguardration change
+3. Re-validate after configuration change
 ```
 
 ## Custom Health Checks
@@ -366,7 +366,7 @@ execution:
 ```bash
 # GUARD ensures:
 # 1. PodDisruptionBudget exists
-# 2. Rolling update strategy confguardred
+# 2. Rolling update strategy configured
 # 3. Sufficient replicas available
 # 4. Traffic shift gradual
 
@@ -455,8 +455,8 @@ jobs:
       - name: Install GUARD
         run: pip install guard
 
-      - name: Confguardre AWS
-        uses: aws-actions/confguardre-aws-credentials@v2
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
@@ -485,8 +485,8 @@ jobs:
       - name: Install GUARD
         run: pip install guard
 
-      - name: Confguardre AWS
-        uses: aws-actions/confguardre-aws-credentials@v2
+      - name: Configure AWS
+        uses: aws-actions/configure-aws-credentials@v2
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1

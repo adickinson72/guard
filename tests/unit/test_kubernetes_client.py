@@ -10,16 +10,17 @@ This module tests the KubernetesClient wrapper for Kubernetes API operations inc
 - Pod command execution
 """
 
-from datetime import datetime
 from unittest.mock import Mock, patch
 
 import pytest
 from kubernetes.client.exceptions import ApiException
 from kubernetes.client.models import (
     V1DaemonSet,
+    V1DaemonSetSpec,
     V1DaemonSetStatus,
     V1Deployment,
     V1DeploymentStatus,
+    V1LabelSelector,
     V1Namespace,
     V1Node,
     V1NodeCondition,
@@ -28,6 +29,7 @@ from kubernetes.client.models import (
     V1Pod,
     V1PodCondition,
     V1PodStatus,
+    V1PodTemplateSpec,
     V1StatefulSet,
     V1StatefulSetStatus,
 )
@@ -51,16 +53,14 @@ class TestKubernetesClientInitialization:
     def test_kubernetes_client_initialization_with_kubeconfig(self) -> None:
         """Test KubernetesClient initializes with custom kubeconfig."""
         with patch("kubernetes.config.load_kube_config") as mock_load:
-            client = KubernetesClient(kubeconfig_path="/path/to/kubeconfig")
+            KubernetesClient(kubeconfig_path="/path/to/kubeconfig")
 
-            mock_load.assert_called_once_with(
-                config_file="/path/to/kubeconfig", context=None
-            )
+            mock_load.assert_called_once_with(config_file="/path/to/kubeconfig", context=None)
 
     def test_kubernetes_client_initialization_with_context(self) -> None:
         """Test KubernetesClient initializes with specific context."""
         with patch("kubernetes.config.load_kube_config") as mock_load:
-            client = KubernetesClient(context="test-context")
+            KubernetesClient(context="test-context")
 
             mock_load.assert_called_once_with(context="test-context")
 
@@ -73,7 +73,7 @@ class TestKubernetesClientInitialization:
 
             mock_load_kube.side_effect = config.ConfigException("Not in cluster")
 
-            client = KubernetesClient()
+            KubernetesClient()
 
             mock_load_kube.assert_called_once()
             mock_load_incluster.assert_called_once()
@@ -144,15 +144,11 @@ class TestCheckNodesReady:
         """Test check_nodes_ready returns True when all nodes ready."""
         mock_node1 = V1Node(
             metadata=V1ObjectMeta(name="node-1"),
-            status=V1NodeStatus(
-                conditions=[V1NodeCondition(type="Ready", status="True")]
-            ),
+            status=V1NodeStatus(conditions=[V1NodeCondition(type="Ready", status="True")]),
         )
         mock_node2 = V1Node(
             metadata=V1ObjectMeta(name="node-2"),
-            status=V1NodeStatus(
-                conditions=[V1NodeCondition(type="Ready", status="True")]
-            ),
+            status=V1NodeStatus(conditions=[V1NodeCondition(type="Ready", status="True")]),
         )
 
         mock_response = Mock()
@@ -168,21 +164,15 @@ class TestCheckNodesReady:
         """Test check_nodes_ready detects unready nodes."""
         mock_node1 = V1Node(
             metadata=V1ObjectMeta(name="node-1"),
-            status=V1NodeStatus(
-                conditions=[V1NodeCondition(type="Ready", status="True")]
-            ),
+            status=V1NodeStatus(conditions=[V1NodeCondition(type="Ready", status="True")]),
         )
         mock_node2 = V1Node(
             metadata=V1ObjectMeta(name="node-2"),
-            status=V1NodeStatus(
-                conditions=[V1NodeCondition(type="Ready", status="False")]
-            ),
+            status=V1NodeStatus(conditions=[V1NodeCondition(type="Ready", status="False")]),
         )
         mock_node3 = V1Node(
             metadata=V1ObjectMeta(name="node-3"),
-            status=V1NodeStatus(
-                conditions=[V1NodeCondition(type="Ready", status="Unknown")]
-            ),
+            status=V1NodeStatus(conditions=[V1NodeCondition(type="Ready", status="Unknown")]),
         )
 
         mock_response = Mock()
@@ -250,15 +240,11 @@ class TestCheckPodsReady:
         """Test check_pods_ready returns True when all pods ready."""
         mock_pod1 = V1Pod(
             metadata=V1ObjectMeta(name="pod-1"),
-            status=V1PodStatus(
-                conditions=[V1PodCondition(type="Ready", status="True")]
-            ),
+            status=V1PodStatus(conditions=[V1PodCondition(type="Ready", status="True")]),
         )
         mock_pod2 = V1Pod(
             metadata=V1ObjectMeta(name="pod-2"),
-            status=V1PodStatus(
-                conditions=[V1PodCondition(type="Ready", status="True")]
-            ),
+            status=V1PodStatus(conditions=[V1PodCondition(type="Ready", status="True")]),
         )
 
         mock_response = Mock()
@@ -274,15 +260,11 @@ class TestCheckPodsReady:
         """Test check_pods_ready detects unready pods."""
         mock_pod1 = V1Pod(
             metadata=V1ObjectMeta(name="pod-1"),
-            status=V1PodStatus(
-                conditions=[V1PodCondition(type="Ready", status="True")]
-            ),
+            status=V1PodStatus(conditions=[V1PodCondition(type="Ready", status="True")]),
         )
         mock_pod2 = V1Pod(
             metadata=V1ObjectMeta(name="pod-2"),
-            status=V1PodStatus(
-                conditions=[V1PodCondition(type="Ready", status="False")]
-            ),
+            status=V1PodStatus(conditions=[V1PodCondition(type="Ready", status="False")]),
         )
 
         mock_response = Mock()
@@ -309,9 +291,7 @@ class TestGetDeployment:
         """Test successful deployment retrieval."""
         mock_deployment = V1Deployment(metadata=V1ObjectMeta(name="test-deployment"))
 
-        k8s_client.apps_v1.read_namespaced_deployment = Mock(
-            return_value=mock_deployment
-        )
+        k8s_client.apps_v1.read_namespaced_deployment = Mock(return_value=mock_deployment)
 
         result = k8s_client.get_deployment(name="test-deployment", namespace="default")
 
@@ -340,78 +320,110 @@ class TestCheckDeploymentReady:
 
     def test_check_deployment_ready_success(self, k8s_client: KubernetesClient) -> None:
         """Test deployment is ready when all conditions met."""
+        from datetime import datetime
+
         from kubernetes.client.models import V1Condition, V1DeploymentSpec
 
         mock_deployment = V1Deployment(
             metadata=V1ObjectMeta(name="test-deployment", generation=5),
-            spec=V1DeploymentSpec(replicas=3),
+            spec=V1DeploymentSpec(
+                replicas=3,
+                selector=V1LabelSelector(match_labels={"app": "test"}),
+                template=V1PodTemplateSpec(metadata=V1ObjectMeta(labels={"app": "test"})),
+            ),
             status=V1DeploymentStatus(
                 observed_generation=5,
                 replicas=3,
                 ready_replicas=3,
                 updated_replicas=3,
                 available_replicas=3,
-                conditions=[V1Condition(type="Available", status="True")],
+                conditions=[
+                    V1Condition(
+                        type="Available",
+                        status="True",
+                        last_transition_time=datetime.now(),
+                        message="Deployment is available",
+                        reason="MinimumReplicasAvailable",
+                    )
+                ],
             ),
         )
 
-        k8s_client.apps_v1.read_namespaced_deployment = Mock(
-            return_value=mock_deployment
-        )
+        k8s_client.apps_v1.read_namespaced_deployment = Mock(return_value=mock_deployment)
 
         result = k8s_client.check_deployment_ready(name="test-deployment", namespace="default")
 
         assert result is True
 
-    def test_check_deployment_ready_replicas_not_ready(
-        self, k8s_client: KubernetesClient
-    ) -> None:
+    def test_check_deployment_ready_replicas_not_ready(self, k8s_client: KubernetesClient) -> None:
         """Test deployment not ready when replicas not updated."""
+        from datetime import datetime
+
         from kubernetes.client.models import V1Condition, V1DeploymentSpec
 
         mock_deployment = V1Deployment(
             metadata=V1ObjectMeta(name="test-deployment", generation=5),
-            spec=V1DeploymentSpec(replicas=3),
+            spec=V1DeploymentSpec(
+                replicas=3,
+                selector=V1LabelSelector(match_labels={"app": "test"}),
+                template=V1PodTemplateSpec(metadata=V1ObjectMeta(labels={"app": "test"})),
+            ),
             status=V1DeploymentStatus(
                 observed_generation=5,
                 replicas=3,
                 ready_replicas=2,
                 updated_replicas=2,
                 available_replicas=2,
-                conditions=[V1Condition(type="Available", status="True")],
+                conditions=[
+                    V1Condition(
+                        type="Available",
+                        status="True",
+                        last_transition_time=datetime.now(),
+                        message="Deployment is available",
+                        reason="MinimumReplicasAvailable",
+                    )
+                ],
             ),
         )
 
-        k8s_client.apps_v1.read_namespaced_deployment = Mock(
-            return_value=mock_deployment
-        )
+        k8s_client.apps_v1.read_namespaced_deployment = Mock(return_value=mock_deployment)
 
         result = k8s_client.check_deployment_ready(name="test-deployment", namespace="default")
 
         assert result is False
 
-    def test_check_deployment_ready_generation_mismatch(
-        self, k8s_client: KubernetesClient
-    ) -> None:
+    def test_check_deployment_ready_generation_mismatch(self, k8s_client: KubernetesClient) -> None:
         """Test deployment not ready when generation mismatch."""
+        from datetime import datetime
+
         from kubernetes.client.models import V1Condition, V1DeploymentSpec
 
         mock_deployment = V1Deployment(
             metadata=V1ObjectMeta(name="test-deployment", generation=5),
-            spec=V1DeploymentSpec(replicas=3),
+            spec=V1DeploymentSpec(
+                replicas=3,
+                selector=V1LabelSelector(match_labels={"app": "test"}),
+                template=V1PodTemplateSpec(metadata=V1ObjectMeta(labels={"app": "test"})),
+            ),
             status=V1DeploymentStatus(
                 observed_generation=4,
                 replicas=3,
                 ready_replicas=3,
                 updated_replicas=3,
                 available_replicas=3,
-                conditions=[V1Condition(type="Available", status="True")],
+                conditions=[
+                    V1Condition(
+                        type="Available",
+                        status="True",
+                        last_transition_time=datetime.now(),
+                        message="Deployment is available",
+                        reason="MinimumReplicasAvailable",
+                    )
+                ],
             ),
         )
 
-        k8s_client.apps_v1.read_namespaced_deployment = Mock(
-            return_value=mock_deployment
-        )
+        k8s_client.apps_v1.read_namespaced_deployment = Mock(return_value=mock_deployment)
 
         result = k8s_client.check_deployment_ready(name="test-deployment", namespace="default")
 
@@ -438,7 +450,10 @@ class TestRestartDeployment:
         # Verify patch was called with restart annotation
         call_args = k8s_client.apps_v1.patch_namespaced_deployment.call_args
         body = call_args[1]["body"]
-        assert "kubectl.kubernetes.io/restartedAt" in body["spec"]["template"]["metadata"]["annotations"]
+        assert (
+            "kubectl.kubernetes.io/restartedAt"
+            in body["spec"]["template"]["metadata"]["annotations"]
+        )
 
     def test_restart_deployment_failure(self, k8s_client: KubernetesClient) -> None:
         """Test restart_deployment raises error on failure."""
@@ -514,9 +529,7 @@ class TestGetNamespaces:
         assert len(result) == 2
         assert result[0].metadata.name == "default"
 
-    def test_get_namespaces_with_label_selector(
-        self, k8s_client: KubernetesClient
-    ) -> None:
+    def test_get_namespaces_with_label_selector(self, k8s_client: KubernetesClient) -> None:
         """Test namespace retrieval with label selector."""
         mock_response = Mock()
         mock_response.items = []
@@ -545,7 +558,12 @@ class TestCheckStatefulSetReady:
 
         mock_sts = V1StatefulSet(
             metadata=V1ObjectMeta(name="test-sts"),
-            spec=V1StatefulSetSpec(replicas=3),
+            spec=V1StatefulSetSpec(
+                replicas=3,
+                selector=V1LabelSelector(match_labels={"app": "test"}),
+                service_name="test-svc",
+                template=V1PodTemplateSpec(metadata=V1ObjectMeta(labels={"app": "test"})),
+            ),
             status=V1StatefulSetStatus(
                 replicas=3,
                 ready_replicas=3,
@@ -568,7 +586,12 @@ class TestCheckStatefulSetReady:
 
         mock_sts = V1StatefulSet(
             metadata=V1ObjectMeta(name="test-sts"),
-            spec=V1StatefulSetSpec(replicas=3),
+            spec=V1StatefulSetSpec(
+                replicas=3,
+                selector=V1LabelSelector(match_labels={"app": "test"}),
+                service_name="test-svc",
+                template=V1PodTemplateSpec(metadata=V1ObjectMeta(labels={"app": "test"})),
+            ),
             status=V1StatefulSetStatus(
                 replicas=3,
                 ready_replicas=2,
@@ -599,11 +622,17 @@ class TestCheckDaemonSetReady:
         """Test daemonset is ready when all conditions met."""
         mock_ds = V1DaemonSet(
             metadata=V1ObjectMeta(name="test-ds"),
+            spec=V1DaemonSetSpec(
+                selector=V1LabelSelector(match_labels={"app": "test"}),
+                template=V1PodTemplateSpec(metadata=V1ObjectMeta(labels={"app": "test"})),
+            ),
             status=V1DaemonSetStatus(
+                current_number_scheduled=5,
                 desired_number_scheduled=5,
                 number_ready=5,
                 updated_number_scheduled=5,
                 number_available=5,
+                number_misscheduled=0,
             ),
         )
 
@@ -617,11 +646,17 @@ class TestCheckDaemonSetReady:
         """Test daemonset not ready when pods not ready."""
         mock_ds = V1DaemonSet(
             metadata=V1ObjectMeta(name="test-ds"),
+            spec=V1DaemonSetSpec(
+                selector=V1LabelSelector(match_labels={"app": "test"}),
+                template=V1PodTemplateSpec(metadata=V1ObjectMeta(labels={"app": "test"})),
+            ),
             status=V1DaemonSetStatus(
+                current_number_scheduled=3,
                 desired_number_scheduled=5,
                 number_ready=3,
                 updated_number_scheduled=3,
                 number_available=3,
+                number_misscheduled=0,
             ),
         )
 
@@ -644,12 +679,13 @@ class TestExecInPod:
     def test_exec_in_pod_success(self, k8s_client: KubernetesClient) -> None:
         """Test successful command execution in pod."""
         mock_stream = Mock()
-        mock_stream.is_open.side_effect = [True, True, False]
-        mock_stream.peek_stdout.side_effect = [True, False, False]
+        mock_stream.is_open.side_effect = [True, False]
+        mock_stream.peek_stdout.return_value = True
         mock_stream.read_stdout.return_value = "command output"
         mock_stream.peek_stderr.return_value = False
+        mock_stream.read_stderr.return_value = ""
 
-        with patch("kubernetes.stream.stream", return_value=mock_stream):
+        with patch("guard.clients.kubernetes_client.stream", return_value=mock_stream):
             result = k8s_client.exec_in_pod(
                 namespace="default",
                 pod_name="test-pod",
@@ -663,11 +699,15 @@ class TestExecInPod:
     def test_exec_in_pod_with_container(self, k8s_client: KubernetesClient) -> None:
         """Test command execution specifies container."""
         mock_stream = Mock()
-        mock_stream.is_open.return_value = False
+        mock_stream.is_open.side_effect = [True, False]
         mock_stream.peek_stdout.return_value = False
+        mock_stream.read_stdout.return_value = ""
         mock_stream.peek_stderr.return_value = False
+        mock_stream.read_stderr.return_value = ""
 
-        with patch("kubernetes.stream.stream", return_value=mock_stream) as mock_stream_func:
+        with patch(
+            "guard.clients.kubernetes_client.stream", return_value=mock_stream
+        ) as mock_stream_func:
             k8s_client.exec_in_pod(
                 namespace="default",
                 pod_name="test-pod",
@@ -680,7 +720,7 @@ class TestExecInPod:
 
     def test_exec_in_pod_api_exception(self, k8s_client: KubernetesClient) -> None:
         """Test exec_in_pod raises KubernetesError on API exception."""
-        with patch("kubernetes.stream.stream") as mock_stream:
+        with patch("guard.clients.kubernetes_client.stream") as mock_stream:
             mock_stream.side_effect = ApiException(status=404, reason="Pod not found")
 
             with pytest.raises(KubernetesError) as exc_info:
@@ -702,9 +742,7 @@ class TestGetWebhookConfigurations:
         with patch("kubernetes.config.load_kube_config"):
             return KubernetesClient()
 
-    def test_get_validating_webhook_configurations(
-        self, k8s_client: KubernetesClient
-    ) -> None:
+    def test_get_validating_webhook_configurations(self, k8s_client: KubernetesClient) -> None:
         """Test validating webhook configuration retrieval."""
         mock_response = Mock()
         mock_response.items = [Mock(), Mock()]
@@ -717,9 +755,7 @@ class TestGetWebhookConfigurations:
 
         assert len(result) == 2
 
-    def test_get_mutating_webhook_configurations(
-        self, k8s_client: KubernetesClient
-    ) -> None:
+    def test_get_mutating_webhook_configurations(self, k8s_client: KubernetesClient) -> None:
         """Test mutating webhook configuration retrieval."""
         mock_response = Mock()
         mock_response.items = [Mock()]

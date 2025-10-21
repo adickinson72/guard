@@ -1,32 +1,32 @@
-# Confguardration Guide
+# Configuration Guide
 
-This guide covers all confguardration options for GUARD (GitOps Upgrade Automation with Rollback Detection).
+This guide covers all configuration options for GUARD (GitOps Upgrade Automation with Rollback Detection).
 
 ## Table of Contents
 
-- [Confguardration File Location](#confguardration-file-location)
-- [Confguardration File Format](#confguardration-file-format)
+- [Configuration File Location](#configuration-file-location)
+- [Configuration File Format](#configuration-file-format)
 - [AWS Settings](#aws-settings)
 - [GitLab Settings](#gitlab-settings)
 - [Datadog Settings](#datadog-settings)
 - [Validation Settings](#validation-settings)
 - [Rollback Settings](#rollback-settings)
 - [LLM Settings](#llm-settings)
-- [Batch Confguardration](#batch-confguardration)
-- [Logging Confguardration](#logging-confguardration)
+- [Batch Configuration](#batch-configuration)
+- [Logging Configuration](#logging-configuration)
 - [Cluster Registry](#cluster-registry)
 
-## Confguardration File Location
+## Configuration File Location
 
-GUARD looks for confguardration in the following locations (in order):
+GUARD looks for configuration in the following locations (in order):
 
 1. Path specified via `--config` CLI flag
 2. `~/.guard/config.yaml`
 3. `/etc/guard/config.yaml`
 
-## Confguardration File Format
+## Configuration File Format
 
-GUARD uses YAML format for confguardration. See `examples/config.yaml.example` for a complete example.
+GUARD uses YAML format for configuration. See `examples/config.yaml.example` for a complete example.
 
 ## AWS Settings
 
@@ -163,7 +163,7 @@ aws secretsmanager create-secret \
     --secret-string "sk-xxxxxxxx"
 ```
 
-## Batch Confguardration
+## Batch Configuration
 
 Batches define groups of clusters to upgrade together:
 
@@ -199,7 +199,7 @@ batch_order:
     - staging                        # prod-wave-1 requires staging to complete
 ```
 
-## Logging Confguardration
+## Logging Configuration
 
 ```yaml
 logging:
@@ -275,7 +275,7 @@ guard registry show eks-prod-us-east-1-app1
 
 ## Environment Variables
 
-GUARD also supports confguardration via environment variables:
+GUARD also supports configuration via environment variables:
 
 - `GUARD_CONFIG_PATH` - Path to config file
 - `AWS_PROFILE` - AWS profile to use
@@ -285,7 +285,7 @@ GUARD also supports confguardration via environment variables:
 
 ## Validation
 
-Validate your confguardration file:
+Validate your configuration file:
 
 ```bash
 guard validate --config ~/.guard/config.yaml
@@ -306,7 +306,7 @@ This checks:
 3. **Start with conservative thresholds** and adjust based on experience
 4. **Enable notifications** for production batches
 5. **Use longer soak periods** for production (120+ minutes)
-6. **Test confguardration** with `guard validate` before running upgrades
+6. **Test configuration** with `guard validate` before running upgrades
 7. **Keep config in version control** (excluding secrets)
 8. **Use IAM roles** instead of long-lived credentials
 9. **Enable audit logging** for compliance requirements

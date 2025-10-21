@@ -16,7 +16,9 @@ from guard.core.models import CheckResult, ClusterConfig
 class MockHealthCheck(HealthCheck):
     """Mock health check implementation for testing."""
 
-    def __init__(self, check_name: str, will_pass: bool = True, will_raise: Exception | None = None):
+    def __init__(
+        self, check_name: str, will_pass: bool = True, will_raise: Exception | None = None
+    ):
         """Initialize mock health check.
 
         Args:
@@ -165,18 +167,14 @@ class TestRunAllChecks:
         assert results[0].passed is False
         assert failing_check.was_called
 
-    def test_run_all_checks_empty_check_list(
-        self, sample_cluster_config: ClusterConfig
-    ) -> None:
+    def test_run_all_checks_empty_check_list(self, sample_cluster_config: ClusterConfig) -> None:
         """Test running checks with empty check list."""
         engine = PreCheckEngine(checks=[])
         results = engine.run_all_checks(sample_cluster_config)
 
         assert results == []
 
-    def test_run_all_checks_result_order(
-        self, sample_cluster_config: ClusterConfig
-    ) -> None:
+    def test_run_all_checks_result_order(self, sample_cluster_config: ClusterConfig) -> None:
         """Test that results are returned in execution order."""
         check1 = MockHealthCheck("check1", will_pass=True)
         check2 = MockHealthCheck("check2", will_pass=True)
@@ -189,9 +187,7 @@ class TestRunAllChecks:
         assert results[1].check_name == "check2"
         assert results[2].check_name == "check3"
 
-    def test_run_all_checks_result_messages(
-        self, sample_cluster_config: ClusterConfig
-    ) -> None:
+    def test_run_all_checks_result_messages(self, sample_cluster_config: ClusterConfig) -> None:
         """Test that check result messages are properly set."""
         check1 = MockHealthCheck("check1", will_pass=True)
         check2 = MockHealthCheck("check2", will_pass=False)
@@ -202,9 +198,7 @@ class TestRunAllChecks:
         assert "passed" in results[0].message
         assert "failed" in results[1].message
 
-    def test_run_all_checks_with_metrics(
-        self, sample_cluster_config: ClusterConfig
-    ) -> None:
+    def test_run_all_checks_with_metrics(self, sample_cluster_config: ClusterConfig) -> None:
         """Test that check results include metrics."""
         check1 = MockHealthCheck("check1", will_pass=True)
 
@@ -305,9 +299,7 @@ class TestCheckResultAggregation:
 class TestIntegrationScenarios:
     """Integration tests for realistic check scenarios."""
 
-    def test_realistic_pre_check_scenario(
-        self, sample_cluster_config: ClusterConfig
-    ) -> None:
+    def test_realistic_pre_check_scenario(self, sample_cluster_config: ClusterConfig) -> None:
         """Test a realistic pre-check scenario with multiple checks."""
         # Simulate typical pre-checks: k8s, istio, datadog
         k8s_check = MockHealthCheck("kubernetes_health", will_pass=True)
@@ -338,9 +330,7 @@ class TestIntegrationScenarios:
         assert not istio_check.was_called
         assert not datadog_check.was_called
 
-    def test_pre_check_partial_success(
-        self, sample_cluster_config: ClusterConfig
-    ) -> None:
+    def test_pre_check_partial_success(self, sample_cluster_config: ClusterConfig) -> None:
         """Test pre-check with some checks passing before failure."""
         check1 = MockHealthCheck("check1", will_pass=True)
         check2 = MockHealthCheck("check2", will_pass=True)

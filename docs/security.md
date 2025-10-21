@@ -63,7 +63,7 @@ secrets.yaml
 credentials.json
 ```
 
-❌ **Never store credentials in confguardration files**
+❌ **Never store credentials in configuration files**
 ```yaml
 # BAD - Don't do this!
 gitlab:
@@ -552,7 +552,7 @@ aws cloudtrail lookup-events \
     --start-time "2024-10-18T00:00:00Z"
 
 # Create new role with fresh credentials
-# Update GUARD confguardration
+# Update GUARD configuration
 # Remove deny policy
 ```
 
@@ -608,16 +608,16 @@ aws cloudwatch put-metric-alarm \
 Before deploying GUARD:
 
 - [ ] All credentials stored in AWS Secrets Manager
-- [ ] IAM roles confguardred with least privilege
+- [ ] IAM roles configured with least privilege
 - [ ] MFA enabled for production access
 - [ ] CloudTrail enabled and logging
 - [ ] EKS audit logging enabled
-- [ ] Kubernetes RBAC confguardred (read-only)
-- [ ] Network security groups confguardred
-- [ ] VPC endpoints confguardred for AWS services
+- [ ] Kubernetes RBAC configured (read-only)
+- [ ] Network security groups configured
+- [ ] VPC endpoints configured for AWS services
 - [ ] Credential rotation policy defined
 - [ ] Incident response playbook documented
-- [ ] Security monitoring and alerts confguardred
+- [ ] Security monitoring and alerts configured
 - [ ] Regular security audits scheduled
 
 ## Reporting Security Issues

@@ -1,7 +1,7 @@
 """AWS client for EKS and related operations."""
 
 import base64
-from typing import Any
+from typing import Any, cast
 
 import boto3
 from botocore.exceptions import ClientError
@@ -17,18 +17,26 @@ logger = get_logger(__name__)
 class AWSClient:
     """AWS client for STS, EKS operations."""
 
-    def __init__(self, region: str = "us-east-1", profile: str | None = None):
+    def __init__(
+        self,
+        region: str = "us-east-1",
+        profile: str | None = None,
+        session: boto3.Session | None = None,
+    ):
         """Initialize AWS client.
 
         Args:
             region: AWS region
             profile: AWS profile name (optional)
+            session: Existing boto3 session (optional, overrides profile)
         """
         self.region = region
         self.profile = profile
 
         # Create session
-        if profile:
+        if session:
+            self.session = session
+        elif profile:
             self.session = boto3.Session(profile_name=profile, region_name=region)
         else:
             self.session = boto3.Session(region_name=region)
@@ -39,8 +47,32 @@ class AWSClient:
 
         logger.debug("aws_client_initialized", region=region, profile=profile)
 
+    @classmethod
+    def from_assumed_role(
+        cls, role_arn: str, region: str = "us-east-1", session_name: str | None = None
+    ) -> "AWSClient":
+        """Create AWSClient from an assumed IAM role.
+
+        Args:
+            role_arn: IAM role ARN to assume
+            region: AWS region
+            session_name: Session name (defaults to 'GUARD-Session')
+
+        Returns:
+            New AWSClient with assumed role credentials
+
+        Raises:
+            AWSError: If role assumption fails
+        """
+        # Create a temporary client to assume the role
+        temp_client = cls(region=region)
+        assumed_session = temp_client.assume_role(role_arn, session_name)
+
+        # Create new client with assumed session
+        return cls(region=region, session=assumed_session)
+
     @rate_limited("aws_api")
-    @retry_on_exception(exceptions=(ClientError,), max_attempts=3)
+    @retry_on_exception(exceptions=(ClientError, AWSError), max_attempts=3)
     def assume_role(self, role_arn: str, session_name: str | None = None) -> boto3.Session:
         """Assume an IAM role and return a new session.
 
@@ -85,7 +117,7 @@ class AWSClient:
             raise AWSError(f"Failed to assume role {role_arn}: {error_code}") from e
 
     @rate_limited("aws_api")
-    @retry_on_exception(exceptions=(ClientError,), max_attempts=3)
+    @retry_on_exception(exceptions=(ClientError, AWSError), max_attempts=3)
     def get_eks_cluster_info(self, cluster_name: str) -> dict[str, Any]:
         """Get EKS cluster information.
 
@@ -102,7 +134,7 @@ class AWSClient:
             logger.debug("getting_eks_cluster_info", cluster_name=cluster_name)
 
             response = self.eks.describe_cluster(name=cluster_name)
-            cluster_info = response["cluster"]
+            cluster_info = cast(dict[str, Any], response["cluster"])
 
             logger.info("eks_cluster_info_retrieved", cluster_name=cluster_name)
             return cluster_info
@@ -163,6 +195,8 @@ class AWSClient:
 
             # Get credentials from the session
             credentials = self.session.get_credentials()
+            if credentials is None:
+                raise AWSError(f"Failed to get credentials for cluster {cluster_name}")
             frozen_credentials = credentials.get_frozen_credentials()
 
             # Create a request signer

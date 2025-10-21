@@ -25,7 +25,7 @@ class IstioService:
     the basis for IstioProvider.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize Istio service."""
         logger.debug("istio_service_initialized")
 

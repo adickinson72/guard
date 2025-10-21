@@ -4,7 +4,7 @@ import threading
 import time
 from collections.abc import Callable
 from functools import wraps
-from typing import TypeVar
+from typing import Any, TypeVar
 
 from guard.utils.logging import get_logger
 
@@ -120,7 +120,7 @@ class TokenBucket:
 class RateLimiter:
     """Manager for multiple rate limiters by name."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize rate limiter manager."""
         self._limiters: dict[str, TokenBucket] = {}
         self._lock = threading.Lock()
@@ -231,7 +231,7 @@ def rate_limited(limiter_name: str, tokens: int = 1) -> Callable[[F], F]:
 
     def decorator(func: F) -> F:
         @wraps(func)
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             rate_limiter = get_rate_limiter()
 
             logger.debug(

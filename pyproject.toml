@@ -85,6 +85,7 @@ ignore = [
     "E501",   # line too long (handled by formatter)
     "B008",   # do not perform function calls in argument defaults
     "W191",   # indentation contains tabs
+    "SIM117", # nested with statements (prefer readability in tests)
 ]
 
 [tool.ruff.lint.per-file-ignores]
@@ -127,8 +128,20 @@ module = [
     "kubernetes.*",
     "gitlab.*",
     "datadog_api_client.*",
+    "structlog.*",
+    "tenacity.*",
+    "click.*",
+    "rich.*",
 ]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = [
+    "guard.clients.*",
+    "guard.gitops.*",
+    "guard.adapters.*",
+]
+warn_return_any = false
 
 # ==============================================================================
 # Pytest Configuration

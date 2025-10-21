@@ -14,7 +14,7 @@ class ValidatorRegistry:
     validators to be registered and retrieved for execution.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize validator registry."""
         self._validators: list[Validator] = []
         self._validators_by_name: dict[str, Validator] = {}
@@ -74,14 +74,14 @@ class ValidatorRegistry:
         """
         return self._validators.copy()
 
-    def get_validators(self, cluster: ClusterConfig) -> list[Validator]:
+    def get_validators(self, _cluster: ClusterConfig) -> list[Validator]:
         """Get validators applicable for a specific cluster.
 
         Currently returns all validators. Future enhancement could
         filter validators based on cluster metadata/tags.
 
         Args:
-            cluster: Cluster configuration
+            _cluster: Cluster configuration (reserved for future use)
 
         Returns:
             List of applicable validators

@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import Any
 
 
 @dataclass
@@ -24,7 +25,7 @@ class PodInfo:
     ready: bool
     phase: str
     conditions: dict[str, str]
-    container_statuses: list[dict[str, any]]
+    container_statuses: list[dict[str, Any]]
 
 
 @dataclass

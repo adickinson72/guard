@@ -5,9 +5,7 @@ All external dependencies (kubectl, flux, istioctl) are mocked.
 """
 
 import subprocess
-import time
-from datetime import datetime
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 from kubernetes.client.models import (
@@ -89,7 +87,7 @@ def sample_deployment_with_sidecar() -> V1Deployment:
                         V1Container(name="istio-proxy", image="istio/proxyv2:1.20.0"),
                     ]
                 ),
-            )
+            ),
         ),
     )
 
@@ -107,8 +105,8 @@ def sample_deployment_without_sidecar() -> V1Deployment:
                     containers=[
                         V1Container(name="app", image="standalone-app:latest"),
                     ]
-                )
-            )
+                ),
+            ),
         ),
     )
 
@@ -149,7 +147,9 @@ class TestValidationEngineWaitForFluxSync:
         """Test successful Flux sync wait."""
         # Mock both kustomizations and helmreleases as ready
         kustomizations_output = "flux-system\tflux-system\tmaster/abc123\tFalse\tTrue\tApplied"
-        helmreleases_output = "istio-system\tistio-base\t1.20.0\tFalse\tTrue\tRelease reconciliation succeeded"
+        helmreleases_output = (
+            "istio-system\tistio-base\t1.20.0\tFalse\tTrue\tRelease reconciliation succeeded"
+        )
 
         mock_subprocess_run.side_effect = [
             subprocess.CompletedProcess(
@@ -203,7 +203,9 @@ class TestValidationEngineWaitForFluxSync:
         """Test Flux sync when kustomizations are not ready."""
         # Kustomizations not ready, helmreleases ready
         kustomizations_output = "flux-system\tflux-system\tmaster/abc123\tFalse\tFalse\tReconciling"
-        helmreleases_output = "istio-system\tistio-base\t1.20.0\tFalse\tTrue\tRelease reconciliation succeeded"
+        helmreleases_output = (
+            "istio-system\tistio-base\t1.20.0\tFalse\tTrue\tRelease reconciliation succeeded"
+        )
 
         mock_subprocess_run.side_effect = [
             subprocess.CompletedProcess(
@@ -303,7 +305,70 @@ class TestValidationEngineRunSoakPeriod:
     ) -> None:
         """Test that soak period logs progress at intervals."""
         # Mock time progression through multiple intervals
-        mock_time.side_effect = [0, 60, 120, 180, 240, 300, 360, 420, 480, 540, 600, 660, 720, 780, 840, 900, 960, 1020, 1080, 1140, 1200, 1260, 1320, 1380, 1440, 1500, 1560, 1620, 1680, 1740, 1800, 1860, 1920, 1980, 2040, 2100, 2160, 2220, 2280, 2340, 2400, 2460, 2520, 2580, 2640, 2700, 2760, 2820, 2880, 2940, 3000, 3060, 3120, 3180, 3240, 3300, 3360, 3420, 3480, 3540, 3600, 3600]
+        mock_time.side_effect = [
+            0,
+            60,
+            120,
+            180,
+            240,
+            300,
+            360,
+            420,
+            480,
+            540,
+            600,
+            660,
+            720,
+            780,
+            840,
+            900,
+            960,
+            1020,
+            1080,
+            1140,
+            1200,
+            1260,
+            1320,
+            1380,
+            1440,
+            1500,
+            1560,
+            1620,
+            1680,
+            1740,
+            1800,
+            1860,
+            1920,
+            1980,
+            2040,
+            2100,
+            2160,
+            2220,
+            2280,
+            2340,
+            2400,
+            2460,
+            2520,
+            2580,
+            2640,
+            2700,
+            2760,
+            2820,
+            2880,
+            2940,
+            3000,
+            3060,
+            3120,
+            3180,
+            3240,
+            3300,
+            3360,
+            3420,
+            3480,
+            3540,
+            3600,
+            3600,
+        ]
 
         validation_engine.run_soak_period(progress_interval=60)
 
@@ -511,9 +576,7 @@ class TestValidationEngineHasIstioSidecar:
 
         assert has_sidecar is True
 
-    def test_has_istio_sidecar_with_annotation(
-        self, validation_engine: ValidationEngine
-    ) -> None:
+    def test_has_istio_sidecar_with_annotation(self, validation_engine: ValidationEngine) -> None:
         """Test detection via sidecar.istio.io/status annotation."""
         deployment = V1Deployment(
             spec=V1DeploymentSpec(
@@ -524,7 +587,7 @@ class TestValidationEngineHasIstioSidecar:
                         annotations={"sidecar.istio.io/status": '{"version":"1.20.0"}'},
                     ),
                     spec=V1PodSpec(containers=[V1Container(name="app", image="app:latest")]),
-                )
+                ),
             )
         )
 
@@ -545,7 +608,7 @@ class TestValidationEngineHasIstioSidecar:
                         annotations={"sidecar.istio.io/inject": "true"},
                     ),
                     spec=V1PodSpec(containers=[V1Container(name="app", image="app:latest")]),
-                )
+                ),
             )
         )
 
@@ -559,15 +622,11 @@ class TestValidationEngineHasIstioSidecar:
         sample_deployment_without_sidecar: V1Deployment,
     ) -> None:
         """Test detection when no sidecar is present."""
-        has_sidecar = validation_engine._has_istio_sidecar(
-            sample_deployment_without_sidecar.spec
-        )
+        has_sidecar = validation_engine._has_istio_sidecar(sample_deployment_without_sidecar.spec)
 
         assert has_sidecar is False
 
-    def test_has_istio_sidecar_with_exception(
-        self, validation_engine: ValidationEngine
-    ) -> None:
+    def test_has_istio_sidecar_with_exception(self, validation_engine: ValidationEngine) -> None:
         """Test sidecar detection handles exceptions gracefully."""
         # Pass invalid spec that will raise exception
         has_sidecar = validation_engine._has_istio_sidecar(None)
@@ -729,8 +788,8 @@ class TestValidationEngineRestartPodsWithIstioSidecars:
                                 V1Container(name="app", image="app:latest"),
                                 V1Container(name="istio-proxy", image="istio/proxyv2:1.20.0"),
                             ]
-                        )
-                    )
+                        ),
+                    ),
                 ),
             )
             deployments.append(dep)
@@ -756,9 +815,7 @@ class TestValidationEngineRestartPodsWithIstioSidecars:
         """Test that exceptions are handled gracefully."""
         mock_k8s_client.get_namespaces.side_effect = Exception("API error")
 
-        result = validation_engine.restart_pods_with_istio_sidecars(
-            k8s_client=mock_k8s_client
-        )
+        result = validation_engine.restart_pods_with_istio_sidecars(k8s_client=mock_k8s_client)
 
         assert result.passed is False
         assert "failed" in result.message.lower()

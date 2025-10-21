@@ -21,16 +21,16 @@ class FailureAnalyzer:
 
     def analyze_failure(
         self,
-        failure_data: dict,
-        logs: str | None = None,
-        metrics: dict | None = None,
+        _failure_data: dict,
+        _logs: str | None = None,
+        _metrics: dict | None = None,
     ) -> str:
         """Analyze upgrade failure.
 
         Args:
-            failure_data: Failure information
-            logs: Logs (optional)
-            metrics: Metrics (optional)
+            _failure_data: Failure information (reserved for future implementation)
+            _logs: Logs (reserved for future implementation)
+            _metrics: Metrics (reserved for future implementation)
 
         Returns:
             Analysis summary

@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any
 
 
 @dataclass
@@ -102,7 +103,7 @@ class MetricsProvider(ABC):
     @abstractmethod
     async def check_active_alerts(
         self, tags: dict[str, str] | None = None
-    ) -> tuple[bool, list[dict[str, any]]]:
+    ) -> tuple[bool, list[dict[str, Any]]]:
         """Check for active alerts/monitors.
 
         Args:
@@ -117,7 +118,7 @@ class MetricsProvider(ABC):
         """
 
     @abstractmethod
-    async def get_monitor_status(self, monitor_id: str) -> dict[str, any]:
+    async def get_monitor_status(self, monitor_id: str) -> dict[str, Any]:
         """Get status of a specific monitor.
 
         Args:
@@ -133,7 +134,7 @@ class MetricsProvider(ABC):
     @abstractmethod
     async def query_raw(
         self, query: str, start_time: datetime, end_time: datetime
-    ) -> dict[str, any]:
+    ) -> dict[str, Any]:
         """Execute a raw provider-specific query.
 
         This is an escape hatch for provider-specific functionality

@@ -76,35 +76,32 @@ class IstioSidecarVersionCheck(Check):
                 pods = await k8s.get_pods(namespace=namespace)
 
                 for pod in pods:
-                    # Find istio-proxy container in pod spec
-                    proxy_container = None
-                    if hasattr(pod, "spec") and hasattr(pod.spec, "containers"):
-                        for container in pod.spec.containers:
-                            if hasattr(container, "name") and container.name == "istio-proxy":
-                                proxy_container = container
-                                break
+                    # Find istio-proxy container in container statuses
+                    proxy_image = None
+                    for container_status in pod.container_statuses:
+                        if container_status.get("name") == "istio-proxy":
+                            proxy_image = container_status.get("image")
+                            break
 
-                    if proxy_container:
+                    if proxy_image:
                         total_pods_checked += 1
 
                         # Extract version from container image
-                        actual_version = self._extract_version_from_image(
-                            proxy_container.image
-                        )
+                        actual_version = self._extract_version_from_image(proxy_image)
 
                         # Compare versions
                         if actual_version and actual_version != expected_version:
                             version_mismatches.append(
                                 {
-                                    "pod": f"{namespace}/{pod.metadata.name}",
+                                    "pod": f"{namespace}/{pod.name}",
                                     "expected": expected_version,
                                     "actual": actual_version,
-                                    "image": proxy_container.image,
+                                    "image": proxy_image,
                                 }
                             )
                             logger.warning(
                                 "sidecar_version_mismatch",
-                                pod=f"{namespace}/{pod.metadata.name}",
+                                pod=f"{namespace}/{pod.name}",
                                 expected=expected_version,
                                 actual=actual_version,
                             )

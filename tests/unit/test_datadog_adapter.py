@@ -4,7 +4,7 @@ Tests the Datadog adapter implementation of MetricsProvider interface.
 All Datadog API calls are mocked to ensure tests are isolated and fast.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -24,15 +24,11 @@ class TestDatadogAdapterInit:
         mock_datadog_client_class.return_value = mock_client
 
         adapter = DatadogAdapter(
-            api_key="test-api-key",
-            app_key="test-app-key",
-            site="datadoghq.com"
+            api_key="test-api-key", app_key="test-app-key", site="datadoghq.com"
         )
 
         mock_datadog_client_class.assert_called_once_with(
-            api_key="test-api-key",
-            app_key="test-app-key",
-            site="datadoghq.com"
+            api_key="test-api-key", app_key="test-app-key", site="datadoghq.com"
         )
         assert adapter.client == mock_client
 
@@ -42,16 +38,10 @@ class TestDatadogAdapterInit:
         mock_client = MagicMock()
         mock_datadog_client_class.return_value = mock_client
 
-        adapter = DatadogAdapter(
-            api_key="test-api-key",
-            app_key="test-app-key",
-            site="datadoghq.eu"
-        )
+        DatadogAdapter(api_key="test-api-key", app_key="test-app-key", site="datadoghq.eu")
 
         mock_datadog_client_class.assert_called_once_with(
-            api_key="test-api-key",
-            app_key="test-app-key",
-            site="datadoghq.eu"
+            api_key="test-api-key", app_key="test-app-key", site="datadoghq.eu"
         )
 
     @patch("guard.adapters.datadog_adapter.DatadogClient")
@@ -84,12 +74,9 @@ class TestDatadogAdapterQueryTimeseries:
                 {
                     "metric": "istio.request.duration.p95",
                     "scope": "cluster:test-cluster,service:istio-system",
-                    "pointlist": [
-                        [1704067200000, 125.5],
-                        [1704067260000, 130.2]
-                    ]
+                    "pointlist": [[1704067200000, 125.5], [1704067260000, 130.2]],
                 }
-            ]
+            ],
         }
         mock_datadog_client_class.return_value = mock_client
 
@@ -100,7 +87,7 @@ class TestDatadogAdapterQueryTimeseries:
             start_time=start_time,
             end_time=end_time,
             tags={"cluster": "test-cluster", "service": "istio-system"},
-            aggregation="avg"
+            aggregation="avg",
         )
 
         # Verify query was built correctly
@@ -124,21 +111,14 @@ class TestDatadogAdapterQueryTimeseries:
         mock_client = MagicMock()
         mock_client.query_metrics.return_value = {
             "status": "ok",
-            "series": [
-                {
-                    "metric": "system.cpu.usage",
-                    "pointlist": [[1704067200000, 45.3]]
-                }
-            ]
+            "series": [{"metric": "system.cpu.usage", "pointlist": [[1704067200000, 45.3]]}],
         }
         mock_datadog_client_class.return_value = mock_client
 
         adapter = DatadogAdapter(api_key="test", app_key="test")
 
         result = await adapter.query_timeseries(
-            metric_name="system.cpu.usage",
-            start_time=start_time,
-            end_time=end_time
+            metric_name="system.cpu.usage", start_time=start_time, end_time=end_time
         )
 
         # Query should not have tag filter
@@ -150,7 +130,9 @@ class TestDatadogAdapterQueryTimeseries:
 
     @pytest.mark.asyncio
     @patch("guard.adapters.datadog_adapter.DatadogClient")
-    async def test_query_timeseries_empty_result(self, mock_datadog_client_class: MagicMock) -> None:
+    async def test_query_timeseries_empty_result(
+        self, mock_datadog_client_class: MagicMock
+    ) -> None:
         """Test timeseries query with no data points."""
         start_time = datetime(2024, 1, 1, 0, 0, 0)
         end_time = datetime(2024, 1, 1, 1, 0, 0)
@@ -162,9 +144,7 @@ class TestDatadogAdapterQueryTimeseries:
         adapter = DatadogAdapter(api_key="test", app_key="test")
 
         result = await adapter.query_timeseries(
-            metric_name="nonexistent.metric",
-            start_time=start_time,
-            end_time=end_time
+            metric_name="nonexistent.metric", start_time=start_time, end_time=end_time
         )
 
         assert result == []
@@ -187,19 +167,17 @@ class TestDatadogAdapterQueryTimeseries:
                     "pointlist": [
                         [1704067200000, 10.0],
                         [1704067260000, None],  # Null value should be filtered
-                        [1704067320000, 20.0]
-                    ]
+                        [1704067320000, 20.0],
+                    ],
                 }
-            ]
+            ],
         }
         mock_datadog_client_class.return_value = mock_client
 
         adapter = DatadogAdapter(api_key="test", app_key="test")
 
         result = await adapter.query_timeseries(
-            metric_name="test.metric",
-            start_time=start_time,
-            end_time=end_time
+            metric_name="test.metric", start_time=start_time, end_time=end_time
         )
 
         # Should only have 2 points (null filtered out)
@@ -219,9 +197,7 @@ class TestDatadogAdapterQueryTimeseries:
 
         with pytest.raises(MetricsProviderError) as exc_info:
             await adapter.query_timeseries(
-                metric_name="test.metric",
-                start_time=datetime.now(),
-                end_time=datetime.now()
+                metric_name="test.metric", start_time=datetime.now(), end_time=datetime.now()
             )
 
         assert "Failed to query timeseries" in str(exc_info.value)
@@ -246,20 +222,17 @@ class TestDatadogAdapterQueryScalar:
                     "pointlist": [
                         [1704067200000, 10.0],
                         [1704067260000, 20.0],
-                        [1704067320000, 30.0]
-                    ]
+                        [1704067320000, 30.0],
+                    ],
                 }
-            ]
+            ],
         }
         mock_datadog_client_class.return_value = mock_client
 
         adapter = DatadogAdapter(api_key="test", app_key="test")
 
         result = await adapter.query_scalar(
-            metric_name="test.metric",
-            start_time=start_time,
-            end_time=end_time,
-            aggregation="avg"
+            metric_name="test.metric", start_time=start_time, end_time=end_time, aggregation="avg"
         )
 
         # Should return average of all points: (10 + 20 + 30) / 3 = 20.0
@@ -278,9 +251,7 @@ class TestDatadogAdapterQueryScalar:
         adapter = DatadogAdapter(api_key="test", app_key="test")
 
         result = await adapter.query_scalar(
-            metric_name="nonexistent.metric",
-            start_time=datetime.now(),
-            end_time=datetime.now()
+            metric_name="nonexistent.metric", start_time=datetime.now(), end_time=datetime.now()
         )
 
         assert result == 0.0
@@ -297,9 +268,7 @@ class TestDatadogAdapterQueryScalar:
 
         with pytest.raises(MetricsProviderError) as exc_info:
             await adapter.query_scalar(
-                metric_name="test.metric",
-                start_time=datetime.now(),
-                end_time=datetime.now()
+                metric_name="test.metric", start_time=datetime.now(), end_time=datetime.now()
             )
 
         assert "Failed to query scalar" in str(exc_info.value)
@@ -320,7 +289,7 @@ class TestDatadogAdapterQueryStatistics:
             "min": 10.0,
             "max": 30.0,
             "avg": 20.0,
-            "last": 25.0
+            "last": 25.0,
         }
         mock_client.query_metrics.return_value = {
             "status": "ok",
@@ -330,10 +299,10 @@ class TestDatadogAdapterQueryStatistics:
                     "pointlist": [
                         [1704067200000, 10.0],
                         [1704067260000, 20.0],
-                        [1704067320000, 30.0]
-                    ]
+                        [1704067320000, 30.0],
+                    ],
                 }
-            ]
+            ],
         }
         mock_datadog_client_class.return_value = mock_client
 
@@ -343,7 +312,7 @@ class TestDatadogAdapterQueryStatistics:
             metric_name="test.metric",
             start_time=start_time,
             end_time=end_time,
-            tags={"cluster": "test"}
+            tags={"cluster": "test"},
         )
 
         assert result["min"] == 10.0
@@ -364,9 +333,7 @@ class TestDatadogAdapterQueryStatistics:
 
         with pytest.raises(MetricsProviderError) as exc_info:
             await adapter.query_statistics(
-                metric_name="test.metric",
-                start_time=datetime.now(),
-                end_time=datetime.now()
+                metric_name="test.metric", start_time=datetime.now(), end_time=datetime.now()
             )
 
         assert "Failed to query statistics" in str(exc_info.value)
@@ -377,7 +344,9 @@ class TestDatadogAdapterCheckActiveAlerts:
 
     @pytest.mark.asyncio
     @patch("guard.adapters.datadog_adapter.DatadogClient")
-    async def test_check_active_alerts_no_alerts(self, mock_datadog_client_class: MagicMock) -> None:
+    async def test_check_active_alerts_no_alerts(
+        self, mock_datadog_client_class: MagicMock
+    ) -> None:
         """Test checking alerts when none are active."""
         mock_client = MagicMock()
         mock_client.check_monitor_health.return_value = (True, [])
@@ -393,13 +362,18 @@ class TestDatadogAdapterCheckActiveAlerts:
 
     @pytest.mark.asyncio
     @patch("guard.adapters.datadog_adapter.DatadogClient")
-    async def test_check_active_alerts_with_alerts(self, mock_datadog_client_class: MagicMock) -> None:
+    async def test_check_active_alerts_with_alerts(
+        self, mock_datadog_client_class: MagicMock
+    ) -> None:
         """Test checking alerts when some are active."""
         mock_client = MagicMock()
-        mock_client.check_monitor_health.return_value = (False, [
-            {"id": 123, "name": "High CPU", "status": "alert"},
-            {"id": 456, "name": "High Memory", "status": "warn"}
-        ])
+        mock_client.check_monitor_health.return_value = (
+            False,
+            [
+                {"id": 123, "name": "High CPU", "status": "alert"},
+                {"id": 456, "name": "High Memory", "status": "warn"},
+            ],
+        )
         mock_datadog_client_class.return_value = mock_client
 
         adapter = DatadogAdapter(api_key="test", app_key="test")
@@ -447,7 +421,7 @@ class TestDatadogAdapterGetMonitorStatus:
             "name": "API Latency",
             "type": "metric alert",
             "query": "avg(last_5m):avg:api.latency{*} > 500",
-            "overall_state": "OK"
+            "overall_state": "OK",
         }
         mock_datadog_client_class.return_value = mock_client
 
@@ -492,7 +466,7 @@ class TestDatadogAdapterQueryRaw:
             "res_type": "time_series",
             "series": [{"metric": "custom.metric", "pointlist": [[1704067200000, 42.0]]}],
             "from_date": 1704067200000,
-            "to_date": 1704070800000
+            "to_date": 1704070800000,
         }
         mock_client.query_metrics.return_value = raw_response
         mock_datadog_client_class.return_value = mock_client
@@ -500,16 +474,12 @@ class TestDatadogAdapterQueryRaw:
         adapter = DatadogAdapter(api_key="test", app_key="test")
 
         result = await adapter.query_raw(
-            query="sum:custom.metric{*}.rollup(sum, 3600)",
-            start_time=start_time,
-            end_time=end_time
+            query="sum:custom.metric{*}.rollup(sum, 3600)", start_time=start_time, end_time=end_time
         )
 
         assert result == raw_response
         mock_client.query_metrics.assert_called_once_with(
-            "sum:custom.metric{*}.rollup(sum, 3600)",
-            start_time,
-            end_time
+            "sum:custom.metric{*}.rollup(sum, 3600)", start_time, end_time
         )
 
     @pytest.mark.asyncio
@@ -524,9 +494,7 @@ class TestDatadogAdapterQueryRaw:
 
         with pytest.raises(MetricsProviderError) as exc_info:
             await adapter.query_raw(
-                query="invalid{query",
-                start_time=datetime.now(),
-                end_time=datetime.now()
+                query="invalid{query", start_time=datetime.now(), end_time=datetime.now()
             )
 
         assert "Failed to execute raw query" in str(exc_info.value)

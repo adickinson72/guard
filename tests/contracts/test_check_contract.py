@@ -4,6 +4,7 @@ All Check implementations must pass these tests to ensure substitutability.
 """
 
 import pytest
+
 from guard.core.models import CheckResult, ClusterConfig
 from guard.interfaces.check import Check, CheckContext
 
@@ -19,7 +20,7 @@ class CheckContract:
     @pytest.fixture
     def sample_cluster(self) -> ClusterConfig:
         """Sample cluster configuration for testing."""
-        from guard.core.models import DatadogTags, ClusterMetadata
+        from guard.core.models import DatadogTags
 
         return ClusterConfig(
             cluster_id="test-cluster-1",

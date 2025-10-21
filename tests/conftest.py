@@ -4,18 +4,21 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from pydantic import BaseModel
 
 from guard.core.models import ClusterConfig, DatadogTags
 
 
 @pytest.fixture(autouse=True)
-def mock_rate_limiters():
-    """Mock rate limiter decorators for all tests."""
-    with patch('guard.utils.rate_limiter.rate_limited') as mock:
-        # Return decorator that just passes through the function
-        mock.return_value = lambda func: func
-        yield mock
+def mock_rate_limiters(request):
+    """Mock rate limiter for all tests to avoid registration issues."""
+    # Skip mocking for tests marked with no_rate_limiter_mock
+    if "no_rate_limiter_mock" in request.keywords:
+        yield
+        return
+
+    # Mock the RateLimiter.acquire method to always succeed
+    with patch("guard.utils.rate_limiter.RateLimiter.acquire", return_value=True):
+        yield
 
 
 @pytest.fixture
@@ -190,3 +193,4 @@ def pytest_configure(config: Any) -> None:
     config.addinivalue_line("markers", "unit: Unit tests")
     config.addinivalue_line("markers", "integration: Integration tests")
     config.addinivalue_line("markers", "e2e: End-to-end tests")
+    config.addinivalue_line("markers", "no_rate_limiter_mock: Disable rate limiter mocking")

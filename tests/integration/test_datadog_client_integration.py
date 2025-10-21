@@ -299,9 +299,7 @@ class TestDatadogClientMonitorOperations:
                 test_tag = monitors[0].tags[0]
 
                 # Query with this tag
-                filtered_monitors = datadog_client.monitors_api.list_monitors(
-                    tags=test_tag
-                )
+                filtered_monitors = datadog_client.monitors_api.list_monitors(tags=test_tag)
 
                 assert isinstance(filtered_monitors, list)
                 # Should have at least one monitor (the one we got the tag from)

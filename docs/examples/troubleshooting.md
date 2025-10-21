@@ -5,7 +5,7 @@ Common issues and solutions when using GUARD.
 ## Table of Contents
 
 - [Installation Issues](#installation-issues)
-- [Confguardration Issues](#confguardration-issues)
+- [Configuration Issues](#configuration-issues)
 - [AWS/DynamoDB Issues](#awsdynamodb-issues)
 - [GitLab Issues](#gitlab-issues)
 - [Datadog Issues](#datadog-issues)
@@ -83,14 +83,14 @@ source venv/bin/activate
 pip install guard
 ```
 
-## Confguardration Issues
+## Configuration Issues
 
 ### Issue: Config file not found
 
 **Symptoms:**
 ```bash
 $ guard run --batch test --target-version 1.20.0
-Error: Confguardration file not found: /home/user/.guard/config.yaml
+Error: Configuration file not found: /home/user/.guard/config.yaml
 ```
 
 **Solutions:**
@@ -110,12 +110,12 @@ cp examples/config.yaml.example ~/.guard/config.yaml
 guard run --config /path/to/config.yaml --batch test --target-version 1.20.0
 ```
 
-### Issue: Invalid confguardration
+### Issue: Invalid configuration
 
 **Symptoms:**
 ```bash
 $ guard validate
-Error: Invalid confguardration: 1 validation error for GuardConfig
+Error: Invalid configuration: 1 validation error for GuardConfig
 aws
   field required (type=value_error.missing)
 ```
@@ -153,9 +153,9 @@ Error: Unable to locate credentials
 
 **Solutions:**
 
-1. **Confguardre AWS CLI:**
+1. **Configure AWS CLI:**
 ```bash
-aws confguardre
+aws configure
 # Enter: Access Key ID, Secret Access Key, Region, Output format
 ```
 
@@ -583,7 +583,7 @@ kubectl logs -n istio-system -l app=istio-ingressgateway --tail=100
 2. **Check for known issues:**
    - Review Istio release notes for target version
    - Check for breaking changes
-   - Look for confguardration incompatibilities
+   - Look for configuration incompatibilities
 
 3. **Rollback:**
 ```bash

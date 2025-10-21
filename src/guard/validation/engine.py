@@ -3,6 +3,7 @@
 import subprocess
 import time
 from datetime import datetime
+from typing import Any
 
 from guard.clients.kubernetes_client import KubernetesClient
 from guard.core.models import CheckResult, ClusterConfig
@@ -361,7 +362,7 @@ class ValidationEngine:
             timestamp=datetime.utcnow(),
         )
 
-    def _has_istio_sidecar(self, workload_spec: dict) -> bool:
+    def _has_istio_sidecar(self, workload_spec: Any) -> bool:
         """Check if a workload has an Istio sidecar.
 
         Args:
@@ -509,7 +510,7 @@ class ValidationEngine:
                 wave_restarted = []
 
                 # Restart all workloads in this wave
-                for kind, ns, name, workload_obj in wave_workloads:
+                for kind, ns, name, _workload_obj in wave_workloads:
                     try:
                         if kind == "Deployment":
                             k8s_client.restart_deployment(name=name, namespace=ns)

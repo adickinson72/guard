@@ -66,7 +66,7 @@ class IstioHelmUpdater(ConfigUpdater):
                 logger.debug("backup_created", backup_path=str(backup_path))
 
             # Load YAML
-            with open(file_path) as f:
+            with file_path.open() as f:
                 config = yaml.safe_load(f)
 
             if not config:
@@ -95,7 +95,7 @@ class IstioHelmUpdater(ConfigUpdater):
             config["spec"]["chart"]["spec"]["version"] = clean_version
 
             # Write back
-            with open(file_path, "w") as f:
+            with file_path.open("w") as f:
                 yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
             logger.info(
@@ -130,7 +130,7 @@ class IstioHelmUpdater(ConfigUpdater):
         try:
             logger.debug("getting_current_version", file_path=str(file_path))
 
-            with open(file_path) as f:
+            with file_path.open() as f:
                 config = yaml.safe_load(f)
 
             if not config:
@@ -177,7 +177,7 @@ class IstioHelmUpdater(ConfigUpdater):
 
             # Try to load YAML
             try:
-                with open(file_path) as f:
+                with file_path.open() as f:
                     config = yaml.safe_load(f)
             except yaml.YAMLError as e:
                 errors.append(f"Invalid YAML: {e}")
@@ -235,7 +235,7 @@ class IstioHelmUpdater(ConfigUpdater):
                 return False
 
             # Check if it's a HelmRelease
-            with open(file_path) as f:
+            with file_path.open() as f:
                 config = yaml.safe_load(f)
 
             if not config:
@@ -355,7 +355,7 @@ class IstioHelmUpdater(ConfigUpdater):
                     ) from e
 
             # Load YAML
-            with open(file_path) as f:
+            with file_path.open() as f:
                 config = yaml.safe_load(f)
 
             if not config:
@@ -383,7 +383,7 @@ class IstioHelmUpdater(ConfigUpdater):
                     raise ConfigUpdaterError(f"Failed to update field '{update.path}': {e}") from e
 
             # Write back (only if all updates succeeded)
-            with open(file_path, "w") as f:
+            with file_path.open("w") as f:
                 yaml.dump(updated_config, f, default_flow_style=False, sort_keys=False)
 
             logger.info(

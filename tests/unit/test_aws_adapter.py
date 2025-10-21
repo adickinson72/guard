@@ -4,11 +4,13 @@ Tests the AWS adapter implementation of CloudProvider interface.
 All AWS SDK calls are mocked to ensure tests are isolated and fast.
 """
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from botocore.exceptions import ClientError
-from unittest.mock import AsyncMock, MagicMock, patch
 
 from guard.adapters.aws_adapter import AWSAdapter
+from guard.interfaces.cloud_types import CloudCredentials, ClusterInfo, ClusterToken
 from guard.interfaces.exceptions import CloudProviderError
 
 
@@ -19,7 +21,7 @@ class TestAWSAdapterInit:
     def test_init_with_defaults(self, mock_aws_client_class: MagicMock) -> None:
         """Test initializing adapter with default parameters."""
         mock_client = MagicMock()
-        mock_session = MagicMock()
+        MagicMock()
         mock_secrets_client = MagicMock()
         mock_client.session.client.return_value = mock_secrets_client
         mock_aws_client_class.return_value = mock_client
@@ -34,12 +36,12 @@ class TestAWSAdapterInit:
     def test_init_with_custom_region_and_profile(self, mock_aws_client_class: MagicMock) -> None:
         """Test initializing adapter with custom region and profile."""
         mock_client = MagicMock()
-        mock_session = MagicMock()
+        MagicMock()
         mock_secrets_client = MagicMock()
         mock_client.session.client.return_value = mock_secrets_client
         mock_aws_client_class.return_value = mock_client
 
-        adapter = AWSAdapter(region="us-west-2", profile="dev")
+        AWSAdapter(region="us-west-2", profile="dev")
 
         mock_aws_client_class.assert_called_once_with(region="us-west-2", profile="dev")
 
@@ -68,19 +70,18 @@ class TestAWSAdapterAssumeRole:
 
         # Test assume_role
         result = await adapter.assume_role(
-            role_arn="arn:aws:iam::123456789:role/TestRole",
-            session_name="test-session"
+            role_arn="arn:aws:iam::123456789:role/TestRole", session_name="test-session"
         )
 
         # Verify
         mock_client.assume_role.assert_called_once_with(
-            "arn:aws:iam::123456789:role/TestRole",
-            "test-session"
+            "arn:aws:iam::123456789:role/TestRole", "test-session"
         )
-        assert result["access_key_id"] == "AKIAIOSFODNN7EXAMPLE"
-        assert result["secret_access_key"] == "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-        assert result["session_token"] == "mock-session-token"
-        assert result["expiration"] is None
+        assert isinstance(result, CloudCredentials)
+        assert result.access_key_id == "AKIAIOSFODNN7EXAMPLE"
+        assert result.secret_access_key == "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        assert result.session_token == "mock-session-token"
+        assert result.expiration is None
 
     @pytest.mark.asyncio
     @patch("guard.adapters.aws_adapter.AWSClient")
@@ -95,8 +96,7 @@ class TestAWSAdapterAssumeRole:
 
         with pytest.raises(CloudProviderError) as exc_info:
             await adapter.assume_role(
-                role_arn="arn:aws:iam::123456789:role/TestRole",
-                session_name="test-session"
+                role_arn="arn:aws:iam::123456789:role/TestRole", session_name="test-session"
             )
 
         assert "Failed to assume role" in str(exc_info.value)
@@ -186,7 +186,7 @@ class TestAWSAdapterGetClusterInfo:
             "version": "1.28",
             "status": "ACTIVE",
             "arn": "arn:aws:eks:us-east-1:123456789:cluster/test-cluster",
-            "name": "test-cluster"
+            "name": "test-cluster",
         }
         mock_client.session.client.return_value = MagicMock()
         mock_aws_client_class.return_value = mock_client
@@ -196,12 +196,13 @@ class TestAWSAdapterGetClusterInfo:
         result = await adapter.get_cluster_info("test-cluster")
 
         mock_client.get_eks_cluster_info.assert_called_once_with("test-cluster")
-        assert result["endpoint"] == "https://ABC123.eks.us-east-1.amazonaws.com"
-        assert result["ca_certificate"] == "LS0tLS1CRUdJTi..."
-        assert result["version"] == "1.28"
-        assert result["status"] == "ACTIVE"
-        assert result["arn"] == "arn:aws:eks:us-east-1:123456789:cluster/test-cluster"
-        assert result["name"] == "test-cluster"
+        assert isinstance(result, ClusterInfo)
+        assert result.endpoint == "https://ABC123.eks.us-east-1.amazonaws.com"
+        assert result.ca_certificate == "LS0tLS1CRUdJTi..."
+        assert result.version == "1.28"
+        assert result.status == "ACTIVE"
+        assert result.arn == "arn:aws:eks:us-east-1:123456789:cluster/test-cluster"
+        assert result.name == "test-cluster"
 
     @pytest.mark.asyncio
     @patch("guard.adapters.aws_adapter.AWSClient")
@@ -232,7 +233,7 @@ class TestAWSAdapterGenerateClusterToken:
             "token": "k8s-aws-v1.abc123",
             "endpoint": "https://ABC123.eks.us-east-1.amazonaws.com",
             "ca_data": "LS0tLS1CRUdJTi...",
-            "expiration": "2024-01-01T12:00:00Z"
+            "expiration": "2024-01-01T12:00:00Z",
         }
         mock_client.session.client.return_value = MagicMock()
         mock_aws_client_class.return_value = mock_client
@@ -242,10 +243,11 @@ class TestAWSAdapterGenerateClusterToken:
         result = await adapter.generate_cluster_token("test-cluster")
 
         mock_client.generate_kubeconfig_token.assert_called_once_with("test-cluster")
-        assert result["token"] == "k8s-aws-v1.abc123"
-        assert result["endpoint"] == "https://ABC123.eks.us-east-1.amazonaws.com"
-        assert result["ca_data"] == "LS0tLS1CRUdJTi..."
-        assert result["expiration"] == "2024-01-01T12:00:00Z"
+        assert isinstance(result, ClusterToken)
+        assert result.token == "k8s-aws-v1.abc123"
+        assert result.endpoint == "https://ABC123.eks.us-east-1.amazonaws.com"
+        assert result.ca_data == "LS0tLS1CRUdJTi..."
+        assert result.expiration == "2024-01-01T12:00:00Z"
 
     @pytest.mark.asyncio
     @patch("guard.adapters.aws_adapter.AWSClient")
@@ -272,11 +274,7 @@ class TestAWSAdapterListClusters:
     async def test_list_clusters_success(self, mock_aws_client_class: MagicMock) -> None:
         """Test successful cluster listing."""
         mock_client = MagicMock()
-        mock_client.list_eks_clusters.return_value = [
-            "cluster-1",
-            "cluster-2",
-            "cluster-3"
-        ]
+        mock_client.list_eks_clusters.return_value = ["cluster-1", "cluster-2", "cluster-3"]
         mock_client.session.client.return_value = MagicMock()
         mock_aws_client_class.return_value = mock_client
 
@@ -323,7 +321,9 @@ class TestAWSAdapterListClusters:
 
     @pytest.mark.asyncio
     @patch("guard.adapters.aws_adapter.AWSClient")
-    async def test_list_clusters_with_region_parameter(self, mock_aws_client_class: MagicMock) -> None:
+    async def test_list_clusters_with_region_parameter(
+        self, mock_aws_client_class: MagicMock
+    ) -> None:
         """Test list_clusters with region parameter (currently ignored by implementation)."""
         mock_client = MagicMock()
         mock_client.list_eks_clusters.return_value = ["cluster-1"]

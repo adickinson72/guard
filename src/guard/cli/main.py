@@ -1,9 +1,25 @@
 """Main CLI entry point for GUARD."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 import click
 from rich.console import Console
 
 from guard import __version__
+
+if TYPE_CHECKING:
+    from guard.adapters.aws_adapter import AWSAdapter
+    from guard.adapters.datadog_adapter import DatadogAdapter
+    from guard.adapters.gitlab_adapter import GitLabAdapter
+    from guard.core.config import GuardConfig
+    from guard.core.models import ClusterConfig
+    from guard.gitops.updaters.istio_helm_updater import IstioHelmUpdater
+    from guard.registry.cluster_registry import ClusterRegistry
+    from guard.registry.lock_manager import LockManager
+    from guard.utils.cluster_credentials import ClusterCredentialManager
+    from guard.utils.kubeconfig import KubeconfigManager
 
 console = Console()
 
@@ -15,6 +31,152 @@ LOGO = """
  \\______  /______/\\____|__  /____|_  /_______  /
         \\/                \\/       \\/        \\/
 """
+
+
+class GuardContext:
+    """Shared context for CLI commands with lazy initialization."""
+
+    def __init__(self, config_path: str):
+        """Initialize context with config path.
+
+        Args:
+            config_path: Path to configuration file
+        """
+        self.config_path = config_path
+        self._config: GuardConfig | None = None
+        self._registry: ClusterRegistry | None = None
+        self._datadog_credentials: tuple[str, str] | None = None
+        self._gitlab_token: str | None = None
+        self._aws_adapter: AWSAdapter | None = None
+        self._datadog_adapter: DatadogAdapter | None = None
+        self._gitlab_adapter: GitLabAdapter | None = None
+        self._helm_updater: IstioHelmUpdater | None = None
+        self._kubeconfig_manager: KubeconfigManager | None = None
+        self._credential_manager: ClusterCredentialManager | None = None
+        self._lock_manager: LockManager | None = None
+
+    @property
+    def config(self) -> GuardConfig:
+        """Get or create config lazily."""
+        if self._config is None:
+            from pathlib import Path
+
+            from guard.core.config import GuardConfig
+
+            config_path = Path(self.config_path).expanduser()
+            self._config = GuardConfig.from_file(str(config_path))
+        return self._config
+
+    @property
+    def registry(self) -> ClusterRegistry:
+        """Get or create cluster registry lazily."""
+        if self._registry is None:
+            from guard.registry.cluster_registry import ClusterRegistry
+
+            self._registry = ClusterRegistry(
+                table_name=self.config.aws.dynamodb.table_name,
+                region=self.config.aws.region,
+            )
+        return self._registry
+
+    @property
+    def datadog_credentials(self) -> tuple[str, str]:
+        """Get Datadog credentials from AWS Secrets Manager (cached)."""
+        if self._datadog_credentials is None:
+            from guard.utils.secrets import SecretsManager
+
+            secrets_manager = SecretsManager(region=self.config.aws.region)
+            credentials = secrets_manager.get_secret_json(
+                self.config.aws.secrets_manager.datadog_credentials_secret
+            )
+            self._datadog_credentials = (credentials["api_key"], credentials["app_key"])
+        return self._datadog_credentials
+
+    @property
+    def gitlab_token(self) -> str:
+        """Get GitLab token from AWS Secrets Manager (cached)."""
+        if self._gitlab_token is None:
+            from guard.utils.secrets import SecretsManager
+
+            secrets_manager = SecretsManager(region=self.config.aws.region)
+            self._gitlab_token = secrets_manager.get_secret(
+                self.config.aws.secrets_manager.gitlab_token_secret
+            )
+        return self._gitlab_token
+
+    @property
+    def aws_adapter(self) -> AWSAdapter:
+        """Get or create AWS adapter lazily."""
+        if self._aws_adapter is None:
+            from guard.adapters.aws_adapter import AWSAdapter
+
+            self._aws_adapter = AWSAdapter(region=self.config.aws.region)
+        return self._aws_adapter
+
+    @property
+    def datadog_adapter(self) -> DatadogAdapter:
+        """Get or create Datadog adapter lazily."""
+        if self._datadog_adapter is None:
+            from guard.adapters.datadog_adapter import DatadogAdapter
+
+            api_key, app_key = self.datadog_credentials
+            self._datadog_adapter = DatadogAdapter(api_key=api_key, app_key=app_key)
+        return self._datadog_adapter
+
+    @property
+    def gitlab_adapter(self) -> GitLabAdapter:
+        """Get or create GitLab adapter lazily."""
+        if self._gitlab_adapter is None:
+            from guard.adapters.gitlab_adapter import GitLabAdapter
+
+            self._gitlab_adapter = GitLabAdapter(
+                url=self.config.gitlab.url,
+                token=self.gitlab_token,
+            )
+        return self._gitlab_adapter
+
+    @property
+    def helm_updater(self) -> IstioHelmUpdater:
+        """Get or create Istio Helm updater lazily."""
+        if self._helm_updater is None:
+            from guard.gitops.updaters.istio_helm_updater import IstioHelmUpdater
+
+            self._helm_updater = IstioHelmUpdater()
+        return self._helm_updater
+
+    @property
+    def kubeconfig_manager(self) -> KubeconfigManager:
+        """Get or create kubeconfig manager lazily."""
+        if self._kubeconfig_manager is None:
+            from guard.utils.kubeconfig import KubeconfigManager
+
+            # Use temporary kubeconfig managed by GUARD
+            self._kubeconfig_manager = KubeconfigManager()
+        return self._kubeconfig_manager
+
+    @property
+    def credential_manager(self) -> ClusterCredentialManager:
+        """Get or create cluster credential manager lazily."""
+        if self._credential_manager is None:
+            from guard.utils.cluster_credentials import ClusterCredentialManager
+
+            self._credential_manager = ClusterCredentialManager(
+                aws_adapter=self.aws_adapter,
+                kubeconfig_manager=self.kubeconfig_manager,
+            )
+        return self._credential_manager
+
+    @property
+    def lock_manager(self) -> LockManager:
+        """Get or create lock manager lazily."""
+        if self._lock_manager is None:
+            from guard.registry.lock_manager import LockManager
+
+            self._lock_manager = LockManager(
+                table_name=self.config.aws.dynamodb.table_name,
+                region=self.config.aws.region,
+            )
+        return self._lock_manager
 
 
 @click.group()
@@ -32,8 +194,8 @@ def cli(ctx: click.Context, config: str) -> None:
     console.print(f"[bold cyan]{LOGO}[/bold cyan]", highlight=False)
     console.print(f"[bold]v{__version__}[/bold]\n")
 
-    ctx.ensure_object(dict)
-    ctx.obj["config"] = config
+    # Initialize shared context with lazy loading
+    ctx.obj = GuardContext(config_path=config)
 
 
 @cli.command()
@@ -47,19 +209,12 @@ def run(
 ) -> None:
     """Run pre-checks and create upgrade MR for a batch."""
     import asyncio
-    from pathlib import Path
 
-    from guard.adapters.aws_adapter import AWSAdapter
-    from guard.adapters.datadog_adapter import DatadogAdapter
-    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
-    from guard.adapters.gitlab_adapter import GitLabAdapter
     from guard.adapters.k8s_adapter import KubernetesAdapter
-    from guard.checks.pre_check_engine import PreCheckOrchestrator
-    from guard.core.config import GuardConfig
+    from guard.checks.check_orchestrator import CheckOrchestrator
+    from guard.checks.check_registry import CheckRegistry
     from guard.gitops.gitops_orchestrator import GitOpsOrchestrator
-    from guard.gitops.updaters.istio_helm_updater import IstioHelmUpdater
     from guard.interfaces.check import CheckContext
-    from guard.registry.cluster_registry import ClusterRegistry
     from guard.services.istio.istio_service import IstioService
     from guard.utils.logging import get_logger
 
@@ -72,83 +227,114 @@ def run(
     console.print(f"Max Concurrent: {max_concurrent}\n")
 
     async def _process_cluster(
-        cluster,
-        semaphore,
-        app_config,
-        target_version,
-        dry_run,
-        aws_adapter,
-        datadog_adapter,
-        gitlab_adapter,
-        helm_updater,
-    ):
+        cluster: ClusterConfig,
+        semaphore: asyncio.Semaphore,
+        target_version: str,
+        dry_run: bool,
+        aws_adapter: AWSAdapter,
+        datadog_adapter: DatadogAdapter,
+        gitlab_adapter: GitLabAdapter,
+        helm_updater: IstioHelmUpdater,
+        credential_manager: ClusterCredentialManager,
+        lock_manager: LockManager,
+        registry: ClusterRegistry,
+    ) -> dict:
         """Process a single cluster with error isolation."""
         async with semaphore:
+            # Acquire cluster lock to prevent concurrent upgrades
             try:
-                console.print(f"[bold]Processing cluster: {cluster.cluster_id}[/bold]")
+                async with lock_manager.acquire_lock(cluster.cluster_id):  # type: ignore[attr-defined]
+                    console.print(f"[bold]Processing cluster: {cluster.cluster_id}[/bold]")
 
-                # Run pre-checks
-                console.print("  Running pre-checks...")
-                k8s_adapter = KubernetesAdapter(context=cluster.cluster_id)
+                    # Setup cluster-specific kubeconfig context with fresh credentials
+                    console.print("  Setting up cluster authentication...")
 
-                # Initialize check orchestrator and register checks
-                check_orchestrator = PreCheckOrchestrator()
+                    # Generate fresh credentials and EKS token (auto-refreshes if expired)
+                    kubeconfig_path = credential_manager.setup_kubeconfig_context(cluster)
 
-                # Register Istio checks
-                istio_service = IstioService()
-                istio_service.register_checks(check_orchestrator)
+                    console.print("  [green]✓ Cluster authentication configured[/green]")
 
-                # Build check context with all required providers
-                check_context = CheckContext(
-                    kubernetes_provider=k8s_adapter,
-                    cloud_provider=aws_adapter,
-                    metrics_provider=datadog_adapter,
-                    extra_context={
-                        "kubeconfig_path": None,  # Use default kubeconfig
-                        "istioctl": None,  # Will be created by check if needed
-                    },
-                )
-
-                check_results = await check_orchestrator.run_all_checks(cluster, check_context)
-                all_passed = all(r.passed for r in check_results)
-
-                if not all_passed:
-                    console.print("  [red]✗ Pre-checks failed[/red]")
-                    for result in check_results:
-                        if not result.passed:
-                            console.print(f"    - {result.check_name}: {result.message}")
-                    logger.error(
-                        "cluster_pre_check_failed",
-                        cluster_id=cluster.cluster_id,
-                        batch_id=batch,
-                    )
-                    return {"cluster_id": cluster.cluster_id, "status": "pre_check_failed"}
-
-                console.print("  [green]✓ All pre-checks passed[/green]")
-
-                # Create upgrade MR
-                if not dry_run:
-                    console.print("  Creating GitLab MR...")
-                    orchestrator = GitOpsOrchestrator(
-                        gitops_provider=gitlab_adapter,
-                        config_updater=helm_updater,
+                    # Run pre-checks
+                    console.print("  Running pre-checks...")
+                    k8s_adapter = KubernetesAdapter(
+                        kubeconfig_path=kubeconfig_path,
+                        context=cluster.cluster_id,
                     )
 
-                    mr_url = await orchestrator.create_upgrade_mr(
-                        cluster=cluster,
-                        target_version=target_version,
+                    # Initialize check registry and orchestrator
+                    check_registry = CheckRegistry()
+
+                    # Register Istio checks
+                    istio_service = IstioService()
+                    istio_service.register_checks(check_registry)
+
+                    # Create orchestrator with registry
+                    check_orchestrator = CheckOrchestrator(registry=check_registry)
+
+                    # Build check context with all required providers
+                    check_context = CheckContext(
+                        kubernetes_provider=k8s_adapter,
+                        cloud_provider=aws_adapter,
+                        metrics_provider=datadog_adapter,
+                        extra_context={
+                            "kubeconfig_path": kubeconfig_path,
+                            "istioctl": None,  # Will be created by check if needed
+                        },
                     )
 
-                    console.print(f"  [green]✓ MR created: {mr_url}[/green]\n")
-                    logger.info(
-                        "cluster_mr_created",
-                        cluster_id=cluster.cluster_id,
-                        mr_url=mr_url,
-                    )
-                    return {"cluster_id": cluster.cluster_id, "status": "success", "mr_url": mr_url}
-                else:
-                    console.print("  [yellow]Dry-run: Skipping MR creation[/yellow]\n")
-                    return {"cluster_id": cluster.cluster_id, "status": "dry_run_success"}
+                    check_results = await check_orchestrator.run_checks(cluster, check_context)
+                    all_passed = all(r.passed for r in check_results)
+
+                    if not all_passed:
+                        console.print("  [red]✗ Pre-checks failed[/red]")
+                        for result in check_results:
+                            if not result.passed:
+                                console.print(f"    - {result.check_name}: {result.message}")
+                        logger.error(
+                            "cluster_pre_check_failed",
+                            cluster_id=cluster.cluster_id,
+                            batch_id=batch,
+                        )
+                        return {"cluster_id": cluster.cluster_id, "status": "pre_check_failed"}
+
+                    console.print("  [green]✓ All pre-checks passed[/green]")
+
+                    # Create upgrade MR
+                    if not dry_run:
+                        console.print("  Creating GitLab MR...")
+                        orchestrator = GitOpsOrchestrator(
+                            git_provider=gitlab_adapter,
+                            config_updater=helm_updater,
+                        )
+
+                        mr = await orchestrator.create_upgrade_mr(
+                            cluster=cluster,
+                            target_version=target_version,
+                        )
+
+                        # Update cluster metadata with MR information
+                        cluster.metadata.mr_created_at = mr.created_at
+                        cluster.metadata.mr_url = mr.web_url
+                        cluster.target_istio_version = target_version
+                        registry.put_cluster(cluster)
+
+                        console.print(f"  [green]✓ MR created: {mr.web_url}[/green]")
+                        console.print(
+                            f"  [yellow]→ After MR is merged, wait {60} minutes before running: guard monitor --batch {batch}[/yellow]\n"
+                        )
+                        logger.info(
+                            "cluster_mr_created",
+                            cluster_id=cluster.cluster_id,
+                            mr_url=mr.web_url,
+                        )
+                        return {
+                            "cluster_id": cluster.cluster_id,
+                            "status": "success",
+                            "mr_url": mr.web_url,
+                        }
+                    else:
+                        console.print("  [yellow]Dry-run: Skipping MR creation[/yellow]\n")
+                        return {"cluster_id": cluster.cluster_id, "status": "dry_run_success"}
 
             except Exception as e:
                 console.print(f"  [red]✗ Error processing cluster: {e}[/red]\n")
@@ -160,21 +346,15 @@ def run(
                 )
                 return {"cluster_id": cluster.cluster_id, "status": "error", "error": str(e)}
 
-    async def _run_upgrade():
+    async def _run_upgrade() -> None:
         try:
-            # Load configuration
-            config_path = Path(ctx.obj["config"]).expanduser()
-            console.print(f"Loading config from {config_path}...")
-            app_config = GuardConfig.from_file(str(config_path))
-
-            # Initialize cluster registry
-            console.print("Initializing cluster registry...")
-            dynamodb = DynamoDBAdapter(region=app_config.aws.region)
-            registry = ClusterRegistry(dynamodb)
+            # Access shared context objects
+            guard_ctx = ctx.obj
+            console.print(f"Loading config from {guard_ctx.config_path}...")
 
             # Get clusters for batch
             console.print(f"Fetching clusters for batch: {batch}...")
-            clusters = await registry.get_clusters_by_batch(batch)
+            clusters = guard_ctx.registry.get_clusters_by_batch(batch)
 
             if not clusters:
                 console.print(f"[red]No clusters found for batch: {batch}[/red]")
@@ -182,19 +362,14 @@ def run(
 
             console.print(f"Found {len(clusters)} cluster(s) in batch {batch}\n")
 
-            # Initialize adapters and clients
-            aws_adapter = AWSAdapter(region=app_config.aws.region)
-            datadog_adapter = DatadogAdapter(
-                api_key=app_config.datadog.api_key,
-                app_key=app_config.datadog.app_key,
-            )
-            gitlab_adapter = GitLabAdapter(
-                url=app_config.gitlab.url,
-                token=app_config.gitlab.token,
-            )
-
-            # Initialize config updater
-            helm_updater = IstioHelmUpdater()
+            # Get adapters from context (lazy-loaded with caching)
+            aws_adapter = guard_ctx.aws_adapter
+            datadog_adapter = guard_ctx.datadog_adapter
+            gitlab_adapter = guard_ctx.gitlab_adapter
+            helm_updater = guard_ctx.helm_updater
+            credential_manager = guard_ctx.credential_manager
+            lock_manager = guard_ctx.lock_manager
+            registry = guard_ctx.registry
 
             # Process clusters with bounded concurrency
             semaphore = asyncio.Semaphore(max_concurrent)
@@ -202,13 +377,15 @@ def run(
                 _process_cluster(
                     cluster,
                     semaphore,
-                    app_config,
                     target_version,
                     dry_run,
                     aws_adapter,
                     datadog_adapter,
                     gitlab_adapter,
                     helm_updater,
+                    credential_manager,
+                    lock_manager,
+                    registry,
                 )
                 for cluster in clusters
             ]
@@ -250,19 +427,15 @@ def run(
 @cli.command()
 @click.option("--batch", required=True, help="Batch name to monitor")
 @click.option("--soak-period", type=int, default=60, help="Soak period in minutes")
+@click.option("--max-concurrent", type=int, default=5, help="Max concurrent cluster monitoring")
 @click.pass_context
-def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
+def monitor(ctx: click.Context, batch: str, soak_period: int, max_concurrent: int) -> None:
     """Monitor post-upgrade validation for a batch."""
     import asyncio
-    from pathlib import Path
 
-    from guard.adapters.datadog_adapter import DatadogAdapter
-    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
-    from guard.adapters.gitlab_adapter import GitLabAdapter
-    from guard.clients.gitlab_client import GitLabClient
-    from guard.core.config import GuardConfig
+    from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+
     from guard.core.models import ClusterStatus, ValidationThresholds
-    from guard.registry.cluster_registry import ClusterRegistry
     from guard.rollback.engine import RollbackEngine
     from guard.services.istio.istio_service import IstioService
     from guard.utils.logging import get_logger
@@ -273,23 +446,18 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
 
     console.print("[bold green]GUARD Monitor Command[/bold green]")
     console.print(f"Batch: {batch}")
-    console.print(f"Soak Period: {soak_period} minutes\n")
+    console.print(f"Soak Period: {soak_period} minutes")
+    console.print(f"Max Concurrent: {max_concurrent}\n")
 
-    async def _monitor_batch():
+    async def _monitor_batch() -> None:
         try:
-            # Load configuration
-            config_path = Path(ctx.obj["config"]).expanduser()
-            console.print(f"Loading config from {config_path}...")
-            app_config = GuardConfig.from_file(str(config_path))
-
-            # Initialize cluster registry
-            console.print("Initializing cluster registry...")
-            dynamodb = DynamoDBAdapter(region=app_config.aws.region)
-            registry = ClusterRegistry(dynamodb)
+            # Access shared context objects
+            guard_ctx = ctx.obj
+            console.print(f"Loading config from {guard_ctx.config_path}...")
 
             # Get clusters for batch
             console.print(f"Fetching clusters for batch: {batch}...")
-            clusters = await registry.get_clusters_by_batch(batch)
+            clusters = guard_ctx.registry.get_clusters_by_batch(batch)
 
             if not clusters:
                 console.print(f"[red]No clusters found for batch: {batch}[/red]")
@@ -297,18 +465,15 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
 
             console.print(f"Found {len(clusters)} cluster(s) in batch {batch}\n")
 
-            # Initialize adapters
-            datadog_adapter = DatadogAdapter(
-                api_key=app_config.datadog.api_key,
-                app_key=app_config.datadog.app_key,
-            )
-            gitlab_adapter = GitLabAdapter(
-                url=app_config.gitlab.url,
-                token=app_config.gitlab.token,
-            )
+            # Get adapters from context (lazy-loaded with caching)
+            datadog_adapter = guard_ctx.datadog_adapter
+
+            # Create GitLab client for rollback
+            from guard.clients.gitlab_client import GitLabClient
+
             gitlab_client = GitLabClient(
-                url=app_config.gitlab.url,
-                token=app_config.gitlab.token,
+                url=guard_ctx.config.gitlab.url,
+                token=guard_ctx.gitlab_token,
             )
 
             # Initialize validation components
@@ -322,7 +487,10 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
                 fail_fast=False,
             )
 
-            rollback_engine = RollbackEngine(gitlab_client=gitlab_client)
+            rollback_engine = RollbackEngine(
+                gitlab_client=gitlab_client,
+                config_updater=guard_ctx.helm_updater,
+            )
 
             # Define validation thresholds
             thresholds = ValidationThresholds(
@@ -335,83 +503,166 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
             console.print(f"[yellow]Waiting {soak_period} minutes for soak period...[/yellow]")
             await asyncio.sleep(soak_period * 60)
 
-            # Monitor each cluster
-            for cluster in clusters:
-                console.print(f"\n[bold]Monitoring cluster: {cluster.cluster_id}[/bold]")
-
-                try:
-                    # Capture baseline metrics (from before upgrade)
-                    console.print("  Capturing baseline metrics...")
-                    baseline = await validation_orchestrator.capture_baseline(
-                        cluster=cluster,
-                        duration_minutes=10,
-                    )
-
-                    # Capture current metrics (post-upgrade)
-                    console.print("  Capturing current metrics...")
-                    current = await validation_orchestrator.capture_current(
-                        cluster=cluster,
-                        baseline=baseline,
-                        duration_minutes=10,
-                    )
-
-                    # Run validation
-                    console.print("  Running validation checks...")
-                    results = await validation_orchestrator.validate_upgrade(
-                        cluster=cluster,
-                        baseline=baseline,
-                        current=current,
-                        thresholds=thresholds,
-                    )
-
-                    all_passed = all(r.passed for r in results)
-
-                    if all_passed:
-                        console.print("  [green]✓ All validations passed[/green]")
-                        await registry.update_status(cluster.cluster_id, ClusterStatus.HEALTHY)
-                        logger.info("cluster_validation_passed", cluster_id=cluster.cluster_id)
-                    else:
-                        console.print("  [red]✗ Validation failed[/red]")
-                        for result in results:
-                            if not result.passed:
-                                console.print(f"    - {result.validator_name}: {result.violations}")
-
-                        # Trigger rollback
-                        console.print("  [yellow]Triggering automated rollback...[/yellow]")
-
-                        failure_metrics = {
-                            result.validator_name: result.violations
-                            for result in results
-                            if not result.passed
-                        }
-
-                        mr_url = await rollback_engine.create_rollback_mr(
-                            cluster=cluster,
-                            current_version=cluster.target_istio_version or "unknown",
-                            previous_version=cluster.current_istio_version,
-                            failure_reason="Post-upgrade validation failed",
-                            failure_metrics=failure_metrics,
+            # Monitor each cluster in parallel with progress tracking
+            async def _monitor_cluster(
+                cluster: ClusterConfig,
+                semaphore: asyncio.Semaphore,
+                progress: Progress,
+                task_id: int,
+            ) -> dict:
+                """Monitor a single cluster with error isolation."""
+                async with semaphore:
+                    try:
+                        progress.update(
+                            task_id,  # type: ignore[arg-type]
+                            description=f"[cyan]{cluster.cluster_id}[/cyan]: Capturing baseline metrics...",
                         )
 
-                        console.print(f"  [green]✓ Rollback MR created: {mr_url}[/green]")
-                        await registry.update_status(
-                            cluster.cluster_id, ClusterStatus.ROLLBACK_REQUIRED
+                        # Capture baseline metrics (from before upgrade)
+                        baseline = await validation_orchestrator.capture_baseline(
+                            cluster=cluster,
+                            duration_minutes=10,
+                        )
+
+                        # Capture current metrics (post-upgrade)
+                        progress.update(
+                            task_id,  # type: ignore[arg-type]
+                            description=f"[cyan]{cluster.cluster_id}[/cyan]: Capturing current metrics...",
+                        )
+                        current = await validation_orchestrator.capture_current(
+                            cluster=cluster,
+                            baseline=baseline,
+                            duration_minutes=10,
+                        )
+
+                        # Run validation
+                        progress.update(
+                            task_id,  # type: ignore[arg-type]
+                            description=f"[cyan]{cluster.cluster_id}[/cyan]: Running validation checks...",
+                        )
+                        results = await validation_orchestrator.validate_upgrade(
+                            cluster=cluster,
+                            baseline=baseline,
+                            current=current,
+                            thresholds=thresholds,
+                        )
+
+                        all_passed = all(r.passed for r in results)
+
+                        if all_passed:
+                            progress.update(
+                                task_id,  # type: ignore[arg-type]
+                                description=f"[green]✓ {cluster.cluster_id}: All validations passed[/green]",
+                            )
+                            guard_ctx.registry.update_cluster_status(
+                                cluster.cluster_id, ClusterStatus.HEALTHY
+                            )
+                            logger.info("cluster_validation_passed", cluster_id=cluster.cluster_id)
+                            return {"cluster_id": cluster.cluster_id, "status": "passed"}
+                        else:
+                            # Trigger rollback
+                            progress.update(
+                                task_id,  # type: ignore[arg-type]
+                                description=f"[yellow]{cluster.cluster_id}: Triggering rollback...[/yellow]",
+                            )
+
+                            failure_metrics = {
+                                result.validator_name: result.violations
+                                for result in results
+                                if not result.passed
+                            }
+
+                            mr_url = await rollback_engine.create_rollback_mr(
+                                cluster=cluster,
+                                current_version=cluster.target_istio_version or "unknown",
+                                previous_version=cluster.current_istio_version,
+                                failure_reason="Post-upgrade validation failed",
+                                failure_metrics=failure_metrics,
+                            )
+
+                            progress.update(
+                                task_id,  # type: ignore[arg-type]
+                                description=f"[red]✗ {cluster.cluster_id}: Validation failed, rollback MR created[/red]",
+                            )
+                            guard_ctx.registry.update_cluster_status(
+                                cluster.cluster_id, ClusterStatus.ROLLBACK_REQUIRED
+                            )
+                            logger.error(
+                                "cluster_validation_failed_rollback_triggered",
+                                cluster_id=cluster.cluster_id,
+                                mr_url=mr_url,
+                            )
+                            return {
+                                "cluster_id": cluster.cluster_id,
+                                "status": "failed",
+                                "mr_url": mr_url,
+                            }
+
+                    except Exception as e:
+                        progress.update(
+                            task_id,  # type: ignore[arg-type]
+                            description=f"[red]✗ {cluster.cluster_id}: Error - {str(e)[:50]}[/red]",
                         )
                         logger.error(
-                            "cluster_validation_failed_rollback_triggered",
+                            "cluster_monitoring_failed",
                             cluster_id=cluster.cluster_id,
-                            mr_url=mr_url,
+                            error=str(e),
                         )
+                        return {
+                            "cluster_id": cluster.cluster_id,
+                            "status": "error",
+                            "error": str(e),
+                        }
 
-                except Exception as e:
-                    console.print(f"  [red]✗ Error monitoring cluster: {e}[/red]")
-                    logger.error(
-                        "cluster_monitoring_failed",
-                        cluster_id=cluster.cluster_id,
-                        error=str(e),
-                    )
+            # Create progress display
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                TimeElapsedColumn(),
+                console=console,
+            ) as progress:
+                # Create tasks for each cluster
+                semaphore = asyncio.Semaphore(max_concurrent)
+                task_ids = [
+                    progress.add_task(f"[cyan]{cluster.cluster_id}[/cyan]: Queued...", total=None)
+                    for cluster in clusters
+                ]
 
-            console.print("\n[bold green]✓ Batch monitoring complete![/bold green]")
+                # Monitor clusters in parallel
+                monitor_tasks = [
+                    _monitor_cluster(cluster, semaphore, progress, task_id)
+                    for cluster, task_id in zip(clusters, task_ids, strict=False)
+                ]
+
+                results = await asyncio.gather(*monitor_tasks, return_exceptions=True)
+
+            # Summarize results
+            console.print("\n[bold]Batch Monitoring Summary[/bold]")
+            passed_count = sum(
+                1 for r in results if isinstance(r, dict) and r.get("status") == "passed"
+            )
+            failed_count = sum(
+                1 for r in results if isinstance(r, dict) and r.get("status") == "failed"
+            )
+            error_count = sum(
+                1 for r in results if isinstance(r, dict) and r.get("status") == "error"
+            )
+
+            console.print(f"  Total: {len(results)}")
+            console.print(f"  [green]Passed: {passed_count}[/green]")
+            console.print(f"  [red]Failed (Rollback Triggered): {failed_count}[/red]")
+            console.print(f"  [yellow]Errors: {error_count}[/yellow]\n")
+
+            logger.info(
+                "batch_monitoring_complete",
+                batch_id=batch,
+                total=len(results),
+                passed=passed_count,
+                failed=failed_count,
+                errors=error_count,
+            )
+
+            console.print("[bold green]✓ Batch monitoring complete![/bold green]")
 
         except Exception as e:
             console.print(f"[red]Error: {e}[/red]")
@@ -431,13 +682,8 @@ def monitor(ctx: click.Context, batch: str, soak_period: int) -> None:
 def rollback(ctx: click.Context, batch: str, reason: str) -> None:
     """Trigger manual rollback for a batch."""
     import asyncio
-    from pathlib import Path
 
-    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
-    from guard.clients.gitlab_client import GitLabClient
-    from guard.core.config import GuardConfig
     from guard.core.models import ClusterStatus
-    from guard.registry.cluster_registry import ClusterRegistry
     from guard.rollback.engine import RollbackEngine
     from guard.utils.logging import get_logger
 
@@ -447,21 +693,15 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
     console.print(f"Batch: {batch}")
     console.print(f"Reason: {reason}\n")
 
-    async def _rollback_batch():
+    async def _rollback_batch() -> None:
         try:
-            # Load configuration
-            config_path = Path(ctx.obj["config"]).expanduser()
-            console.print(f"Loading config from {config_path}...")
-            app_config = GuardConfig.from_file(str(config_path))
-
-            # Initialize cluster registry
-            console.print("Initializing cluster registry...")
-            dynamodb = DynamoDBAdapter(region=app_config.aws.region)
-            registry = ClusterRegistry(dynamodb)
+            # Access shared context objects
+            guard_ctx = ctx.obj
+            console.print(f"Loading config from {guard_ctx.config_path}...")
 
             # Get clusters for batch
             console.print(f"Fetching clusters for batch: {batch}...")
-            clusters = await registry.get_clusters_by_batch(batch)
+            clusters = guard_ctx.registry.get_clusters_by_batch(batch)
 
             if not clusters:
                 console.print(f"[red]No clusters found for batch: {batch}[/red]")
@@ -470,11 +710,16 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
             console.print(f"Found {len(clusters)} cluster(s) in batch {batch}\n")
 
             # Initialize rollback engine
+            from guard.clients.gitlab_client import GitLabClient
+
             gitlab_client = GitLabClient(
-                url=app_config.gitlab.url,
-                token=app_config.gitlab.token,
+                url=guard_ctx.config.gitlab.url,
+                token=guard_ctx.gitlab_token,
             )
-            rollback_engine = RollbackEngine(gitlab_client=gitlab_client)
+            rollback_engine = RollbackEngine(
+                gitlab_client=gitlab_client,
+                config_updater=guard_ctx.helm_updater,
+            )
 
             # Rollback each cluster
             for cluster in clusters:
@@ -491,7 +736,7 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
                     )
 
                     console.print(f"  [green]✓ Rollback MR created: {mr_url}[/green]\n")
-                    await registry.update_status(
+                    guard_ctx.registry.update_cluster_status(
                         cluster.cluster_id, ClusterStatus.ROLLBACK_REQUIRED
                     )
                     logger.info(
@@ -533,33 +778,23 @@ def list_clusters(
     """List clusters and their status."""
     import asyncio
     import json
-    from pathlib import Path
 
     from rich.table import Table
-
-    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
-    from guard.core.config import GuardConfig
-    from guard.registry.cluster_registry import ClusterRegistry
 
     console.print("[bold cyan]GUARD List Command[/bold cyan]")
     console.print(f"Batch Filter: {batch or 'All'}")
     console.print(f"Environment Filter: {environment or 'All'}\n")
 
-    async def _list_clusters():
+    async def _list_clusters() -> None:
         try:
-            # Load configuration
-            config_path = Path(ctx.obj["config"]).expanduser()
-            app_config = GuardConfig.from_file(str(config_path))
-
-            # Initialize cluster registry
-            dynamodb = DynamoDBAdapter(region=app_config.aws.region)
-            registry = ClusterRegistry(dynamodb)
+            # Access shared context objects
+            guard_ctx = ctx.obj
 
             # Get clusters
             if batch:
-                clusters = await registry.get_clusters_by_batch(batch)
+                clusters = guard_ctx.registry.get_clusters_by_batch(batch)
             else:
-                clusters = await registry.list_all_clusters()
+                clusters = guard_ctx.registry.list_all_clusters()
 
             # Filter by environment if specified
             if environment:
@@ -610,20 +845,16 @@ def list_clusters(
 def validate(ctx: click.Context) -> None:
     """Validate configuration and connectivity."""
     import asyncio
-    from pathlib import Path
-
-    from guard.adapters.aws_adapter import AWSAdapter
-    from guard.adapters.datadog_adapter import DatadogAdapter
-    from guard.adapters.dynamodb_adapter import DynamoDBAdapter
-    from guard.adapters.gitlab_adapter import GitLabAdapter
-    from guard.core.config import GuardConfig
 
     console.print("[bold magenta]GUARD Validate Command[/bold magenta]\n")
 
-    async def _validate():
+    async def _validate() -> None:
         try:
-            # Load configuration
-            config_path = Path(ctx.obj["config"]).expanduser()
+            # Access shared context objects
+            guard_ctx = ctx.obj
+            from pathlib import Path
+
+            config_path = Path(guard_ctx.config_path).expanduser()
             console.print("[bold]1. Configuration File[/bold]")
             console.print(f"  Path: {config_path}")
 
@@ -634,7 +865,8 @@ def validate(ctx: click.Context) -> None:
             console.print("  [green]✓ Config file exists[/green]")
 
             try:
-                app_config = GuardConfig.from_file(str(config_path))
+                # Access config to trigger validation
+                _ = guard_ctx.config
                 console.print("  [green]✓ Config file valid[/green]\n")
             except Exception as e:
                 console.print(f"  [red]✗ Config file invalid: {e}[/red]\n")
@@ -643,8 +875,8 @@ def validate(ctx: click.Context) -> None:
             # Validate DynamoDB connectivity
             console.print("[bold]2. DynamoDB Connectivity[/bold]")
             try:
-                dynamodb = DynamoDBAdapter(region=app_config.aws.region)
-                # Try to list tables or describe table
+                # Access registry to test DynamoDB
+                _ = guard_ctx.registry
                 console.print("  [green]✓ DynamoDB connection successful[/green]\n")
             except Exception as e:
                 console.print(f"  [red]✗ DynamoDB connection failed: {e}[/red]\n")
@@ -652,11 +884,7 @@ def validate(ctx: click.Context) -> None:
             # Validate Datadog connectivity
             console.print("[bold]3. Datadog Connectivity[/bold]")
             try:
-                datadog = DatadogAdapter(
-                    api_key=app_config.datadog.api_key,
-                    app_key=app_config.datadog.app_key,
-                )
-                # Try a simple query
+                _ = guard_ctx.datadog_adapter
                 console.print("  [green]✓ Datadog connection successful[/green]\n")
             except Exception as e:
                 console.print(f"  [red]✗ Datadog connection failed: {e}[/red]\n")
@@ -664,10 +892,7 @@ def validate(ctx: click.Context) -> None:
             # Validate GitLab connectivity
             console.print("[bold]4. GitLab Connectivity[/bold]")
             try:
-                gitlab = GitLabAdapter(
-                    url=app_config.gitlab.url,
-                    token=app_config.gitlab.token,
-                )
+                _ = guard_ctx.gitlab_adapter
                 console.print("  [green]✓ GitLab connection successful[/green]\n")
             except Exception as e:
                 console.print(f"  [red]✗ GitLab connection failed: {e}[/red]\n")
@@ -675,7 +900,7 @@ def validate(ctx: click.Context) -> None:
             # Validate AWS connectivity
             console.print("[bold]5. AWS Connectivity[/bold]")
             try:
-                aws = AWSAdapter(region=app_config.aws.region)
+                _ = guard_ctx.aws_adapter
                 console.print("  [green]✓ AWS connection successful[/green]\n")
             except Exception as e:
                 console.print(f"  [red]✗ AWS connection failed: {e}[/red]\n")

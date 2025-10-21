@@ -2,10 +2,6 @@
 
 from unittest.mock import MagicMock, patch
 
-import pytest
-from botocore.exceptions import ClientError
-
-from guard.core.exceptions import AWSError
 from guard.core.models import ClusterStatus
 from guard.registry.cluster_registry import ClusterRegistry
 

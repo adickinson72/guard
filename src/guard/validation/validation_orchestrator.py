@@ -76,7 +76,7 @@ class ValidationOrchestrator:
         required_metrics = list(set(required_metrics))
 
         # Query each metric
-        metrics_data = {}
+        metrics_data: dict[str, float | None] = {}
         failed_metrics = []
         tags = cluster.datadog_tags.model_dump()
 
@@ -84,7 +84,7 @@ class ValidationOrchestrator:
             try:
                 # Use per-metric aggregation instead of hardcoded "avg"
                 aggregation = get_metric_aggregation(metric_name)
-                value = await self.metrics.query_scalar(
+                value: float | None = await self.metrics.query_scalar(
                     metric_name=metric_name,
                     start_time=start_time,
                     end_time=end_time,
@@ -154,15 +154,15 @@ class ValidationOrchestrator:
         start_time = end_time - timedelta(minutes=duration_minutes)
 
         # Query same metrics as baseline
-        metrics_data = {}
+        metrics_data: dict[str, float | None] = {}
         failed_metrics = []
         tags = cluster.datadog_tags.model_dump()
 
-        for metric_name in baseline.metrics.keys():
+        for metric_name in baseline.metrics:
             try:
                 # Use per-metric aggregation instead of hardcoded "avg"
                 aggregation = get_metric_aggregation(metric_name)
-                value = await self.metrics.query_scalar(
+                value: float | None = await self.metrics.query_scalar(
                     metric_name=metric_name,
                     start_time=start_time,
                     end_time=end_time,

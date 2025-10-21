@@ -12,6 +12,9 @@ from guard.utils.rate_limiter import (
     rate_limited,
 )
 
+# Mark all tests in this module to skip rate limiter mocking
+pytestmark = pytest.mark.no_rate_limiter_mock
+
 
 class TestTokenBucket:
     """Test TokenBucket class."""

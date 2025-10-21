@@ -15,7 +15,7 @@ class CheckRegistry:
     checks to be registered and retrieved for execution.
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize check registry."""
         self._checks: list[Check] = []
         self._checks_by_name: dict[str, Check] = {}
@@ -75,14 +75,14 @@ class CheckRegistry:
         """
         return self._checks.copy()
 
-    def get_checks_for_cluster(self, cluster: ClusterConfig) -> list[Check]:
+    def get_checks_for_cluster(self, _cluster: ClusterConfig) -> list[Check]:
         """Get checks applicable for a specific cluster.
 
         Currently returns all checks. Future enhancement could
         filter checks based on cluster metadata/tags.
 
         Args:
-            cluster: Cluster configuration
+            _cluster: Cluster configuration (reserved for future use)
 
         Returns:
             List of applicable checks

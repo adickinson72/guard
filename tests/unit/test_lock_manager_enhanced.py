@@ -8,7 +8,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from botocore.exceptions import ClientError
 
-from guard.core.exceptions import AWSError, LockAcquisitionError
+from guard.core.exceptions import LockAcquisitionError
 from guard.registry.lock_manager import LockManager
 
 

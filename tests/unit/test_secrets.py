@@ -1,10 +1,10 @@
 """Tests for secrets management."""
 
 import json
+from unittest.mock import MagicMock, patch
 
 import pytest
 from botocore.exceptions import ClientError
-from unittest.mock import MagicMock, patch
 
 from guard.core.exceptions import AWSError
 from guard.utils.secrets import SecretsManager
@@ -13,7 +13,7 @@ from guard.utils.secrets import SecretsManager
 @pytest.fixture
 def secrets_manager():
     """Create SecretsManager instance with mocked client."""
-    with patch("boto3.client") as mock_client:
+    with patch("boto3.client"):
         sm = SecretsManager(region="us-east-1")
         sm.client = MagicMock()
         yield sm

@@ -5,7 +5,6 @@ health checks for execution. Tests cover registration, retrieval,
 filtering, and error cases.
 """
 
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -245,9 +244,7 @@ class TestCriticalCheckFiltering:
         critical_checks = registry.get_critical_checks()
         assert critical_checks == []
 
-    def test_get_critical_checks_all_when_all_critical(
-        self, registry: CheckRegistry
-    ) -> None:
+    def test_get_critical_checks_all_when_all_critical(self, registry: CheckRegistry) -> None:
         """Test getting critical checks when all checks are critical."""
         check1 = MockCheck("critical1", "First critical", is_critical_check=True)
         check2 = MockCheck("critical2", "Second critical", is_critical_check=True)

@@ -49,10 +49,13 @@ class IstioLatencyValidator(Validator):
         violations = []
 
         # Check p95 latency
-        baseline_p95 = baseline.metrics.get("istio.request.latency.p95", 0)
-        current_p95 = current.metrics.get("istio.request.latency.p95", 0)
+        baseline_p95 = baseline.metrics.get("istio.request.latency.p95")
+        current_p95 = current.metrics.get("istio.request.latency.p95")
 
-        if baseline_p95 > 0:
+        # Fail validation if metrics are missing
+        if baseline_p95 is None or current_p95 is None:
+            violations.append("P95 latency metrics unavailable - cannot validate latency")
+        elif baseline_p95 > 0:
             increase_percent = ((current_p95 - baseline_p95) / baseline_p95) * 100
 
             if increase_percent > thresholds.latency_p95_increase_percent:
@@ -63,10 +66,13 @@ class IstioLatencyValidator(Validator):
                 )
 
         # Check p99 latency
-        baseline_p99 = baseline.metrics.get("istio.request.latency.p99", 0)
-        current_p99 = current.metrics.get("istio.request.latency.p99", 0)
+        baseline_p99 = baseline.metrics.get("istio.request.latency.p99")
+        current_p99 = current.metrics.get("istio.request.latency.p99")
 
-        if baseline_p99 > 0:
+        # Fail validation if metrics are missing
+        if baseline_p99 is None or current_p99 is None:
+            violations.append("P99 latency metrics unavailable - cannot validate latency")
+        elif baseline_p99 > 0:
             increase_percent = ((current_p99 - baseline_p99) / baseline_p99) * 100
 
             if increase_percent > thresholds.latency_p99_increase_percent:

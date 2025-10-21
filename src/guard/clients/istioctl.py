@@ -38,7 +38,7 @@ class IstioctlWrapper:
         Raises:
             IstioError: If command fails
         """
-        cmd = ["istioctl"] + args
+        cmd = ["istioctl", *args]
 
         # Add kubeconfig if specified
         if self.kubeconfig_path:

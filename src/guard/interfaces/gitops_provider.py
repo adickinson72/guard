@@ -130,6 +130,24 @@ class GitOpsProvider(ABC):
         """
 
     @abstractmethod
+    async def find_merge_request_by_title(
+        self, project_id: str, title: str, state: str = "opened"
+    ) -> MergeRequestInfo | None:
+        """Find a merge request by exact title match.
+
+        Args:
+            project_id: Project identifier
+            title: Exact title to search for
+            state: MR state to filter (opened, closed, merged, all)
+
+        Returns:
+            MergeRequestInfo if found, None otherwise
+
+        Raises:
+            GitOpsProviderError: If search fails
+        """
+
+    @abstractmethod
     async def add_merge_request_comment(self, project_id: str, mr_id: int, comment: str) -> bool:
         """Add a comment to a merge request.
 

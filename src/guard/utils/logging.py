@@ -2,9 +2,14 @@
 
 import logging
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import structlog
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
+
+    from structlog.typing import Processor
 
 
 def setup_logging(level: str = "INFO", format: str = "json", output: str = "stdout") -> None:
@@ -25,6 +30,7 @@ def setup_logging(level: str = "INFO", format: str = "json", output: str = "stdo
     )
 
     # Configure processors based on format
+    processors: Sequence[Processor]
     if format == "json":
         processors = [
             structlog.contextvars.merge_contextvars,
@@ -60,7 +66,8 @@ def get_logger(name: str | None = None) -> structlog.BoundLogger:
     Returns:
         Structured logger instance
     """
-    return structlog.get_logger(name)
+    logger: structlog.BoundLogger = structlog.get_logger(name)
+    return logger
 
 
 def log_operation(

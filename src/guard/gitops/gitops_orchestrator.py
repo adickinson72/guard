@@ -92,6 +92,25 @@ class GitOpsOrchestrator:
             dry_run=dry_run,
         )
 
+        # Generate MR title for deduplication check
+        mr_title = self._generate_mr_title(cluster, target_version)
+
+        # Check if MR already exists (deduplication)
+        existing_mr = await self.git.find_merge_request_by_title(
+            project_id=cluster.gitlab_repo,
+            title=mr_title,
+            state="opened",
+        )
+
+        if existing_mr:
+            logger.info(
+                "upgrade_mr_already_exists",
+                cluster_id=cluster.cluster_id,
+                mr_url=existing_mr.web_url,
+                mr_iid=existing_mr.iid,
+            )
+            return existing_mr
+
         # Generate branch name
         branch_name = self._generate_branch_name(cluster, target_version)
 
@@ -101,7 +120,7 @@ class GitOpsOrchestrator:
             return MergeRequestInfo(
                 id=0,
                 iid=0,
-                title=self._generate_mr_title(cluster, target_version),
+                title=mr_title,
                 description=self._generate_mr_description(cluster, target_version),
                 source_branch=branch_name,
                 target_branch="main",
@@ -115,7 +134,7 @@ class GitOpsOrchestrator:
         # The GitLab API will raise an error if the branch already exists,
         # which is the desired behavior to prevent race conditions.
         await self.git.create_branch(
-            project_id=cluster.gitlab_repo,
+            repository=cluster.gitlab_repo,
             branch_name=branch_name,
             ref="main",
         )
@@ -138,7 +157,7 @@ class GitOpsOrchestrator:
             await self.updater.update_version(tmp_path, target_version)
 
             # Read updated content
-            with open(tmp_path) as f:
+            with tmp_path.open() as f:
                 updated_content = f.read()
 
         finally:
@@ -157,20 +176,13 @@ class GitOpsOrchestrator:
         )
 
         # Create merge request
-        mr_title = self._generate_mr_title(cluster, target_version)
         mr_description = self._generate_mr_description(cluster, target_version)
 
         # Parse assignee from owner_handle if available
-        assignee_id = None
+        assignees = None
         if cluster.owner_handle:
-            # Remove @ prefix if present
-            username = cluster.owner_handle.lstrip("@")
-            user_id = await self.git.get_user_id_by_username(username)
-            if user_id:
-                assignee_id = user_id
-                logger.info("mr_assignee_set", username=username, user_id=user_id)
-            else:
-                logger.warning("user_not_found", username=username)
+            assignees = [cluster.owner_handle]
+            logger.info("mr_assignee_set", username=cluster.owner_handle)
 
         mr = await self.git.create_merge_request(
             project_id=cluster.gitlab_repo,
@@ -179,7 +191,7 @@ class GitOpsOrchestrator:
             title=mr_title,
             description=mr_description,
             draft=draft,
-            assignee_id=assignee_id,
+            assignees=assignees,
         )
 
         logger.info(
@@ -232,11 +244,7 @@ class GitOpsOrchestrator:
             try:
                 # Determine batch_id (use first cluster's batch or combined batch)
                 batch_ids = {c.batch_id for c in cluster_group}
-                if len(batch_ids) == 1:
-                    batch_id = batch_ids.pop()
-                else:
-                    # Multiple batches, use a combined name
-                    batch_id = "-".join(sorted(batch_ids))
+                batch_id = batch_ids.pop() if len(batch_ids) == 1 else "-".join(sorted(batch_ids))
 
                 cluster_ids = [c.cluster_id for c in cluster_group]
 
@@ -281,7 +289,7 @@ class GitOpsOrchestrator:
 
                 # Create branch
                 await self.git.create_branch(
-                    project_id=gitlab_repo,
+                    repository=gitlab_repo,
                     branch_name=branch_name,
                     ref="main",
                 )
@@ -302,7 +310,7 @@ class GitOpsOrchestrator:
 
                     await self.updater.update_version(tmp_path, target_version)
 
-                    with open(tmp_path) as f:
+                    with tmp_path.open() as f:
                         updated_content = f.read()
                 finally:
                     if tmp_path:
@@ -426,7 +434,7 @@ class GitOpsOrchestrator:
 
         # Create branch
         await self.git.create_branch(
-            project_id=cluster.gitlab_repo,
+            repository=cluster.gitlab_repo,
             branch_name=branch_name,
             ref="main",
         )
@@ -447,7 +455,7 @@ class GitOpsOrchestrator:
 
             await self.updater.update_version(tmp_path, rollback_version)
 
-            with open(tmp_path) as f:
+            with tmp_path.open() as f:
                 updated_content = f.read()
         finally:
             if tmp_path:

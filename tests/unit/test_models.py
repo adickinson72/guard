@@ -16,7 +16,6 @@ from guard.core.models import (
     ClusterConfig,
     ClusterMetadata,
     ClusterStatus,
-    DatadogTags,
     UpgradeHistoryEntry,
     ValidationThresholds,
     get_metric_aggregation,

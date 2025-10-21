@@ -43,6 +43,9 @@ class ClusterMetadata(BaseModel):
 
     mesh_id: str | None = None
     multi_cluster: bool = False
+    mr_created_at: datetime | None = None
+    mr_merged_at: datetime | None = None
+    mr_url: str | None = None
 
 
 class ClusterConfig(BaseModel):

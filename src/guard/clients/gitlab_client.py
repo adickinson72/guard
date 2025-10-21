@@ -248,6 +248,61 @@ class GitLabClient:
             )
             raise GitOpsError(f"Failed to list MRs for {project_id}: {e}") from e
 
+    def find_merge_request_by_title(
+        self,
+        project_id: str | int,
+        title: str,
+        state: str = "opened",
+    ) -> Any | None:
+        """Find a merge request by exact title match.
+
+        Args:
+            project_id: Project ID or path
+            title: Exact title to search for
+            state: MR state to filter (opened, closed, merged, all)
+
+        Returns:
+            MR object if found, None otherwise
+
+        Raises:
+            GitOpsError: If search fails
+        """
+        try:
+            logger.debug(
+                "finding_merge_request_by_title",
+                project_id=project_id,
+                title=title,
+                state=state,
+            )
+
+            mrs = self.list_merge_requests(project_id, state=state)
+
+            # Find exact title match
+            for mr in mrs:
+                if mr.title == title:
+                    logger.info(
+                        "merge_request_found",
+                        project_id=project_id,
+                        title=title,
+                        mr_iid=mr.iid,
+                    )
+                    return mr
+
+            logger.debug("merge_request_not_found", project_id=project_id, title=title)
+            return None
+
+        except GitOpsError:
+            # Re-raise GitOpsError from list_merge_requests
+            raise
+        except Exception as e:
+            logger.error(
+                "find_merge_request_failed",
+                project_id=project_id,
+                title=title,
+                error=str(e),
+            )
+            raise GitOpsError(f"Failed to find MR by title in {project_id}: {e}") from e
+
     @rate_limited("gitlab_api")
     @retry_on_exception(exceptions=(GitlabError,), max_attempts=3)
     def create_merge_request(
@@ -418,8 +473,9 @@ class GitLabClient:
             logger.debug("looking_up_user", username=clean_username)
 
             users = self.gl.users.list(username=clean_username)
-            if users:
-                user_id = users[0].id
+            if users and len(users) > 0:
+                # Cast to Any to handle RESTObjectList | list[RESTObject] type
+                user_id: int = users[0].id  # type: ignore[index]
                 logger.info("user_found", username=clean_username, user_id=user_id)
                 return user_id
 

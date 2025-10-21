@@ -11,7 +11,7 @@ import pytest
 from botocore.exceptions import ClientError
 
 from guard.adapters.dynamodb_adapter import DynamoDBAdapter
-from guard.core.models import ClusterConfig, ClusterStatus, DatadogTags
+from guard.core.models import ClusterConfig, ClusterStatus
 from guard.interfaces.exceptions import StateStoreError
 
 
@@ -153,7 +153,7 @@ class TestDynamoDBAdapterGetCluster:
                 "datadog_tags": {"cluster": "test", "service": "istio-system", "env": "test"},
                 "owner_team": "team",
                 "owner_handle": "@team",
-                "status": "pending"
+                "status": "pending",
             }
         }
         mock_dynamodb.Table.return_value = mock_table
@@ -226,7 +226,7 @@ class TestDynamoDBAdapterListClusters:
                     "datadog_tags": {"cluster": "test", "service": "istio-system", "env": "test"},
                     "owner_team": "team",
                     "owner_handle": "@team",
-                    "status": "pending"
+                    "status": "pending",
                 },
                 {
                     "cluster_id": "cluster-2",
@@ -240,8 +240,8 @@ class TestDynamoDBAdapterListClusters:
                     "datadog_tags": {"cluster": "test", "service": "istio-system", "env": "test"},
                     "owner_team": "team",
                     "owner_handle": "@team",
-                    "status": "healthy"
-                }
+                    "status": "healthy",
+                },
             ]
         }
         mock_dynamodb.Table.return_value = mock_table
@@ -275,7 +275,7 @@ class TestDynamoDBAdapterListClusters:
                     "datadog_tags": {"cluster": "test", "service": "istio-system", "env": "test"},
                     "owner_team": "team",
                     "owner_handle": "@team",
-                    "status": "pending"
+                    "status": "pending",
                 }
             ]
         }
@@ -313,7 +313,7 @@ class TestDynamoDBAdapterListClusters:
                     "datadog_tags": {"cluster": "test", "service": "istio-system", "env": "test"},
                     "owner_team": "team",
                     "owner_handle": "@team",
-                    "status": "healthy"
+                    "status": "healthy",
                 },
                 {
                     "cluster_id": "cluster-2",
@@ -327,8 +327,8 @@ class TestDynamoDBAdapterListClusters:
                     "datadog_tags": {"cluster": "test", "service": "istio-system", "env": "test"},
                     "owner_team": "team",
                     "owner_handle": "@team",
-                    "status": "pending"
-                }
+                    "status": "pending",
+                },
             ]
         }
         mock_dynamodb.Table.return_value = mock_table
@@ -391,8 +391,7 @@ class TestDynamoDBAdapterUpdateClusterStatus:
         adapter = DynamoDBAdapter(table_name="test-table")
 
         result = await adapter.update_cluster_status(
-            cluster_id="test-cluster",
-            status=ClusterStatus.HEALTHY
+            cluster_id="test-cluster", status=ClusterStatus.HEALTHY
         )
 
         assert result is True
@@ -417,7 +416,7 @@ class TestDynamoDBAdapterUpdateClusterStatus:
         result = await adapter.update_cluster_status(
             cluster_id="test-cluster",
             status=ClusterStatus.HEALTHY,
-            metadata={"current_istio_version": "1.20.0", "validation_passed": True}
+            metadata={"current_istio_version": "1.20.0", "validation_passed": True},
         )
 
         assert result is True
@@ -517,7 +516,7 @@ class TestDynamoDBAdapterBatchUpdateStatus:
         mock_table.update_item.side_effect = [
             None,  # Success
             ClientError(error_response, "UpdateItem"),  # Failure
-            None  # Success
+            None,  # Success
         ]
 
         mock_dynamodb.Table.return_value = mock_table
@@ -571,7 +570,7 @@ class TestDynamoDBAdapterQueryByBatch:
                     "datadog_tags": {"cluster": "test", "service": "istio-system", "env": "test"},
                     "owner_team": "team",
                     "owner_handle": "@team",
-                    "status": "pending"
+                    "status": "pending",
                 }
             ]
         }

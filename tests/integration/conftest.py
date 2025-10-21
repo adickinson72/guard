@@ -79,9 +79,7 @@ def integration_test_cluster_config() -> ClusterConfig:
     """
     cluster_id = os.getenv("GUARD_TEST_CLUSTER_ID", "eks-integration-test")
     region = os.getenv("GUARD_TEST_CLUSTER_REGION", "us-east-1")
-    role_arn = os.getenv(
-        "GUARD_TEST_CLUSTER_ROLE_ARN", "arn:aws:iam::123456789:role/GUARD-Test"
-    )
+    role_arn = os.getenv("GUARD_TEST_CLUSTER_ROLE_ARN", "arn:aws:iam::123456789:role/GUARD-Test")
 
     return ClusterConfig(
         cluster_id=cluster_id,

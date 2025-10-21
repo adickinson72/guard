@@ -161,7 +161,7 @@ class TestApplyUpgradeSpec:
         assert result is True
 
         # Verify the file was updated
-        with open(temp_helmrelease_file) as f:
+        with temp_helmrelease_file.open() as f:
             updated_config = yaml.safe_load(f)
 
         assert updated_config["spec"]["chart"]["spec"]["version"] == "1.20.0"
@@ -184,7 +184,7 @@ class TestApplyUpgradeSpec:
         assert result is True
 
         # Verify all updates were applied
-        with open(temp_helmrelease_file) as f:
+        with temp_helmrelease_file.open() as f:
             updated_config = yaml.safe_load(f)
 
         assert updated_config["spec"]["chart"]["spec"]["version"] == "1.20.0"
@@ -209,7 +209,7 @@ class TestApplyUpgradeSpec:
         assert backup_path.exists()
 
         # Verify backup contains original content
-        with open(backup_path) as f:
+        with backup_path.open() as f:
             backup_config = yaml.safe_load(f)
 
         assert backup_config["spec"]["chart"]["spec"]["version"] == "1.19.0"
@@ -238,7 +238,7 @@ class TestApplyUpgradeSpec:
         # Creating an UpgradeSpec with invalid paths should raise ValidationError
         # due to the model_validator
         with pytest.raises(ValidationError) as exc_info:
-            spec = UpgradeSpec(
+            UpgradeSpec(
                 version="1.20.0",
                 updates=[FieldUpdate(path="spec..version", value="1.20.0")],  # Invalid path
             )
@@ -291,7 +291,7 @@ class TestApplyUpgradeSpec:
         await updater.apply_upgrade_spec(temp_helmrelease_file, spec)
 
         # Read updated content
-        with open(temp_helmrelease_file) as f:
+        with temp_helmrelease_file.open() as f:
             updated_content = f.read()
 
         # Check that keys are not sorted (apiVersion should still come first)
@@ -318,7 +318,7 @@ class TestApplyUpgradeSpec:
 
         assert result is True
 
-        with open(temp_helmrelease_file) as f:
+        with temp_helmrelease_file.open() as f:
             updated_config = yaml.safe_load(f)
 
         assert updated_config["spec"]["values"]["pilot"]["resources"]["requests"]["cpu"] == "1000m"

@@ -32,11 +32,11 @@ class GitLabAdapter(GitOpsProvider):
         except Exception as e:
             raise GitOpsProviderError(f"Failed to initialize GitLab adapter: {e}") from e
 
-    async def create_branch(self, project_id: str, branch_name: str, ref: str = "main") -> str:
+    async def create_branch(self, repository: str, branch_name: str, ref: str = "main") -> str:
         """Create a new branch.
 
         Args:
-            project_id: Project identifier
+            repository: Repository identifier (GitLab project ID or path)
             branch_name: Name for new branch
             ref: Reference to branch from
 
@@ -47,7 +47,7 @@ class GitLabAdapter(GitOpsProvider):
             GitOpsProviderError: If branch creation fails
         """
         try:
-            branch = self.client.create_branch(project_id, branch_name, ref)
+            branch = self.client.create_branch(repository, branch_name, ref)
             return branch.name
         except Exception as e:
             logger.error("create_branch_failed", branch_name=branch_name, error=str(e))
@@ -111,7 +111,7 @@ class GitLabAdapter(GitOpsProvider):
         title: str,
         description: str,
         draft: bool = True,
-        assignee_ids: list[int] | None = None,
+        assignees: list[str] | None = None,
     ) -> MergeRequestInfo:
         """Create a merge request.
 
@@ -122,7 +122,7 @@ class GitLabAdapter(GitOpsProvider):
             title: MR title
             description: MR description
             draft: Create as draft
-            assignee_ids: Optional list of user IDs to assign
+            assignees: Optional list of user identifiers (usernames or IDs)
 
         Returns:
             Normalized merge request information
@@ -131,7 +131,22 @@ class GitLabAdapter(GitOpsProvider):
             GitOpsProviderError: If MR creation fails
         """
         try:
-            assignee_id = assignee_ids[0] if assignee_ids else None
+            # Convert usernames to user IDs if provided
+            assignee_id = None
+            if assignees and len(assignees) > 0:
+                assignee = assignees[0]
+                # If it's a username (not a number), look up the user ID
+                if not assignee.isdigit():
+                    username = assignee.lstrip("@")
+                    user_id = self.client.get_user_id_by_username(username)
+                    if user_id:
+                        assignee_id = user_id
+                        logger.info("mr_assignee_resolved", username=username, user_id=user_id)
+                    else:
+                        logger.warning("user_not_found", username=username)
+                else:
+                    assignee_id = int(assignee)
+
             mr = self.client.create_merge_request(
                 project_id,
                 source_branch,
@@ -196,6 +211,51 @@ class GitLabAdapter(GitOpsProvider):
         except Exception as e:
             logger.error("get_merge_request_failed", mr_id=mr_id, error=str(e))
             raise GitOpsProviderError(f"Failed to get MR {mr_id}: {e}") from e
+
+    async def find_merge_request_by_title(
+        self, project_id: str, title: str, state: str = "opened"
+    ) -> MergeRequestInfo | None:
+        """Find a merge request by exact title match.
+
+        Args:
+            project_id: Project identifier
+            title: Exact title to search for
+            state: MR state to filter (opened, closed, merged, all)
+
+        Returns:
+            Normalized merge request information if found, None otherwise
+
+        Raises:
+            GitOpsProviderError: If search fails
+        """
+        try:
+            mr = self.client.find_merge_request_by_title(project_id, title, state)
+
+            if mr is None:
+                return None
+
+            # Normalize to MergeRequestInfo
+            return MergeRequestInfo(
+                id=mr.id,
+                iid=mr.iid,
+                title=mr.title,
+                description=mr.description,
+                source_branch=mr.source_branch,
+                target_branch=mr.target_branch,
+                state=mr.state,
+                web_url=mr.web_url,
+                created_at=datetime.fromisoformat(mr.created_at.replace("Z", "+00:00")),
+                updated_at=datetime.fromisoformat(mr.updated_at.replace("Z", "+00:00")),
+            )
+
+        except Exception as e:
+            logger.error(
+                "find_merge_request_by_title_failed",
+                project_id=project_id,
+                title=title,
+                error=str(e),
+            )
+            raise GitOpsProviderError(f"Failed to find MR by title in {project_id}: {e}") from e
 
     async def add_merge_request_comment(self, project_id: str, mr_id: int, comment: str) -> bool:
         """Add a comment to a merge request.

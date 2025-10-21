@@ -5,6 +5,7 @@ from typing import Any
 
 from datadog_api_client import ApiClient, Configuration
 from datadog_api_client.exceptions import ApiException
+from datadog_api_client.model_utils import UnsetType
 from datadog_api_client.v1.api.metrics_api import MetricsApi
 from datadog_api_client.v1.api.monitors_api import MonitorsApi
 
@@ -66,15 +67,9 @@ class DatadogClient:
         """
         try:
             # Convert datetime to Unix timestamp if needed
-            if isinstance(start, datetime):
-                start_ts = int(start.timestamp())
-            else:
-                start_ts = start
+            start_ts = int(start.timestamp()) if isinstance(start, datetime) else start
 
-            if isinstance(end, datetime):
-                end_ts = int(end.timestamp())
-            else:
-                end_ts = end
+            end_ts = int(end.timestamp()) if isinstance(end, datetime) else end
 
             logger.debug(
                 "querying_metrics",
@@ -84,7 +79,7 @@ class DatadogClient:
             )
 
             response = self.metrics_api.query_metrics(
-                from_=start_ts,
+                _from=start_ts,
                 to=end_ts,
                 query=query,
             )
@@ -118,8 +113,8 @@ class DatadogClient:
         try:
             logger.debug("getting_active_alerts", tags=tags)
 
-            # Build tags query
-            tags_query = ",".join(tags) if tags else None
+            # Build tags query - use UnsetType for None
+            tags_query: str | UnsetType = ",".join(tags) if tags else UnsetType.unset
 
             # List all monitors
             monitors = self.monitors_api.list_monitors(

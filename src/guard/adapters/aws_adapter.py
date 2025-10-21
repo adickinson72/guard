@@ -1,11 +1,10 @@
 """AWS adapter implementing CloudProvider interface."""
 
-from typing import Any
-
 from botocore.exceptions import ClientError
 
 from guard.clients.aws_client import AWSClient
 from guard.interfaces.cloud_provider import CloudProvider
+from guard.interfaces.cloud_types import CloudCredentials, ClusterInfo, ClusterToken
 from guard.interfaces.exceptions import CloudProviderError
 from guard.utils.logging import get_logger
 
@@ -30,7 +29,7 @@ class AWSAdapter(CloudProvider):
         self._secrets_client = self.client.session.client("secretsmanager")
         logger.debug("aws_adapter_initialized", region=region)
 
-    async def assume_role(self, role_arn: str, session_name: str) -> dict[str, Any]:
+    async def assume_role(self, role_arn: str, session_name: str) -> CloudCredentials:
         """Assume an IAM role and return credentials.
 
         Args:
@@ -38,7 +37,7 @@ class AWSAdapter(CloudProvider):
             session_name: Session name for tracking
 
         Returns:
-            Dictionary with credentials
+            CloudCredentials object
 
         Raises:
             CloudProviderError: If role assumption fails
@@ -49,12 +48,23 @@ class AWSAdapter(CloudProvider):
             # Extract credentials from session
             credentials = session.get_credentials()
 
-            return {
-                "access_key_id": credentials.access_key,
-                "secret_access_key": credentials.secret_key,
-                "session_token": credentials.token,
-                "expiration": None,  # boto3 doesn't expose expiration directly
-            }
+            # Handle potential None credentials
+            if credentials is None:
+                raise CloudProviderError(f"No credentials returned for role {role_arn}")
+
+            # Handle potential None token (though unlikely for assume_role)
+            if credentials.token is None:
+                raise CloudProviderError(f"No session token returned for role {role_arn}")
+
+            return CloudCredentials(
+                access_key_id=credentials.access_key,
+                secret_access_key=credentials.secret_key,
+                session_token=credentials.token,
+                expiration=None,  # boto3 doesn't expose expiration directly
+            )
+        except CloudProviderError:
+            # Re-raise CloudProviderError as-is
+            raise
         except Exception as e:
             logger.error("assume_role_failed", role_arn=role_arn, error=str(e))
             raise CloudProviderError(f"Failed to assume role {role_arn}: {e}") from e
@@ -89,14 +99,14 @@ class AWSAdapter(CloudProvider):
             logger.error("get_secret_failed", secret_name=secret_name, error_code=error_code)
             raise CloudProviderError(f"Failed to get secret {secret_name}: {error_code}") from e
 
-    async def get_cluster_info(self, cluster_name: str) -> dict[str, Any]:
+    async def get_cluster_info(self, cluster_name: str) -> ClusterInfo:
         """Get cluster information.
 
         Args:
             cluster_name: Name of the cluster
 
         Returns:
-            Dictionary with cluster info
+            ClusterInfo object
 
         Raises:
             CloudProviderError: If cluster info cannot be retrieved
@@ -104,27 +114,27 @@ class AWSAdapter(CloudProvider):
         try:
             cluster_info = self.client.get_eks_cluster_info(cluster_name)
 
-            # Normalize the response
-            return {
-                "endpoint": cluster_info["endpoint"],
-                "ca_certificate": cluster_info["certificateAuthority"]["data"],
-                "version": cluster_info.get("version"),
-                "status": cluster_info.get("status"),
-                "arn": cluster_info.get("arn"),
-                "name": cluster_info.get("name"),
-            }
+            # Create ClusterInfo object
+            return ClusterInfo(
+                endpoint=cluster_info["endpoint"],
+                ca_certificate=cluster_info["certificateAuthority"]["data"],
+                version=cluster_info.get("version"),
+                status=cluster_info.get("status"),
+                arn=cluster_info.get("arn"),
+                name=cluster_info.get("name"),
+            )
         except Exception as e:
             logger.error("get_cluster_info_failed", cluster_name=cluster_name, error=str(e))
             raise CloudProviderError(f"Failed to get cluster info for {cluster_name}: {e}") from e
 
-    async def generate_cluster_token(self, cluster_name: str) -> dict[str, Any]:
+    async def generate_cluster_token(self, cluster_name: str) -> ClusterToken:
         """Generate authentication token for cluster access.
 
         Args:
             cluster_name: Name of the cluster
 
         Returns:
-            Dictionary with token info (token, endpoint, ca_data, expiration)
+            ClusterToken object with token info
 
         Raises:
             CloudProviderError: If token generation fails
@@ -132,12 +142,12 @@ class AWSAdapter(CloudProvider):
         try:
             token_info = self.client.generate_kubeconfig_token(cluster_name)
 
-            return {
-                "token": token_info["token"],
-                "expiration": token_info.get("expiration"),
-                "endpoint": token_info["endpoint"],
-                "ca_data": token_info["ca_data"],
-            }
+            return ClusterToken(
+                token=token_info["token"],
+                expiration=token_info.get("expiration"),
+                endpoint=token_info["endpoint"],
+                ca_data=token_info["ca_data"],
+            )
         except Exception as e:
             logger.error("generate_token_failed", cluster_name=cluster_name, error=str(e))
             raise CloudProviderError(f"Failed to generate token for {cluster_name}: {e}") from e
@@ -162,3 +172,26 @@ class AWSAdapter(CloudProvider):
         except Exception as e:
             logger.error("list_clusters_failed", region=region, error=str(e))
             raise CloudProviderError(f"Failed to list clusters: {e}") from e
+
+    def create_client_for_cluster(
+        self, role_arn: str, region: str | None = None, session_name: str | None = None
+    ) -> AWSClient:
+        """Create an AWS client with assumed role for cluster access.
+
+        Args:
+            role_arn: IAM role ARN for the target cluster
+            region: AWS region (uses adapter's region if None)
+            session_name: Session name (defaults to 'GUARD-Session')
+
+        Returns:
+            AWSClient configured with assumed role credentials
+
+        Raises:
+            CloudProviderError: If client creation fails
+        """
+        try:
+            target_region = region or self.client.region
+            return AWSClient.from_assumed_role(role_arn, target_region, session_name)
+        except Exception as e:
+            logger.error("create_cluster_client_failed", role_arn=role_arn, error=str(e))
+            raise CloudProviderError(f"Failed to create client for role {role_arn}: {e}") from e

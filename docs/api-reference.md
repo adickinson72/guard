@@ -6,7 +6,7 @@ This document provides a reference for GUARD's Python API. While GUARD is primar
 
 - [Installation](#installation)
 - [Core Modules](#core-modules)
-- [Confguardration](#confguardration)
+- [Configuration](#configuration)
 - [Cluster Registry](#cluster-registry)
 - [Pre-Check Engine](#pre-check-engine)
 - [Validation Engine](#validation-engine)
@@ -24,9 +24,9 @@ pip install guard
 
 ## Core Modules
 
-### Confguardration
+### Configuration
 
-Load and manage GUARD confguardration.
+Load and manage GUARD configuration.
 
 ```python
 from guard.core.config import GuardConfig
@@ -34,12 +34,12 @@ from guard.core.config import GuardConfig
 # Load from file
 config = GuardConfig.from_file("~/.guard/config.yaml")
 
-# Access confguardration
+# Access configuration
 print(config.aws.region)
 print(config.gitlab.url)
 print(config.validation.soak_period_minutes)
 
-# Get batch confguardration
+# Get batch configuration
 batch = config.get_batch("prod-wave-1")
 print(batch.clusters)
 ```
@@ -47,19 +47,19 @@ print(batch.clusters)
 **Class**: `GuardConfig`
 
 **Methods**:
-- `from_file(path: str | Path) -> GuardConfig` - Load confguardration from YAML file
-- `get_batch(batch_name: str) -> BatchConfig | None` - Get batch confguardration by name
+- `from_file(path: str | Path) -> GuardConfig` - Load configuration from YAML file
+- `get_batch(batch_name: str) -> BatchConfig | None` - Get batch configuration by name
 - `to_dict() -> dict[str, Any]` - Convert to dictionary
 
 **Attributes**:
-- `aws: AWSConfig` - AWS confguardration
-- `gitlab: GitLabConfig` - GitLab confguardration
-- `datadog: DatadogConfig` - Datadog confguardration
+- `aws: AWSConfig` - AWS configuration
+- `gitlab: GitLabConfig` - GitLab configuration
+- `datadog: DatadogConfig` - Datadog configuration
 - `validation: ValidationConfig` - Validation settings
 - `rollback: RollbackConfig` - Rollback settings
 - `llm: LLMConfig` - LLM settings
 - `batches: list[BatchConfig]` - Batch definitions
-- `logging: LoggingConfig` - Logging confguardration
+- `logging: LoggingConfig` - Logging configuration
 
 ## Cluster Registry
 
@@ -419,7 +419,7 @@ result = ValidationResult(
 
 ```python
 from guard.core.exceptions import (
-    ConfguardrationError,
+    ConfigurationError,
     RegistryError,
     HealthCheckError,
     ValidationError,
@@ -429,8 +429,8 @@ from guard.core.exceptions import (
 
 try:
     config = GuardConfig.from_file("config.yaml")
-except ConfguardrationError as e:
-    print(f"Confguardration error: {e}")
+except ConfigurationError as e:
+    print(f"Configuration error: {e}")
 
 try:
     cluster = registry.get_cluster("invalid-id")
@@ -440,7 +440,7 @@ except RegistryError as e:
 
 **Exception Hierarchy**:
 - `GuardError` (base exception)
-  - `ConfguardrationError` - Confguardration issues
+  - `ConfigurationError` - Configuration issues
   - `RegistryError` - Cluster registry errors
   - `HealthCheckError` - Pre-check failures
   - `ValidationError` - Post-upgrade validation failures
@@ -459,7 +459,7 @@ from guard.gitops.manager import GitOpsManager
 from guard.validation.engine import ValidationEngine
 
 async def main():
-    # Load confguardration
+    # Load configuration
     config = GuardConfig.from_file("~/.guard/config.yaml")
 
     # Initialize components
@@ -535,7 +535,7 @@ mypy your_script.py
 
 ## Logging
 
-Confguardre logging in your application:
+Configure logging in your application:
 
 ```python
 import logging

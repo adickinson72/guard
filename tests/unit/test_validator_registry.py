@@ -167,9 +167,7 @@ class TestValidatorRegistryGetValidator:
 
         assert validator == mock_validator
 
-    def test_get_non_existent_validator_returns_none(
-        self, registry: ValidatorRegistry
-    ) -> None:
+    def test_get_non_existent_validator_returns_none(self, registry: ValidatorRegistry) -> None:
         """Test getting a non-existent validator returns None."""
         validator = registry.get_validator("non_existent_validator")
 
@@ -285,9 +283,7 @@ class TestValidatorRegistryGetCriticalValidators:
         assert mock_validator in critical_validators
         assert mock_non_critical_validator not in critical_validators
 
-    def test_get_critical_validators_empty_registry(
-        self, registry: ValidatorRegistry
-    ) -> None:
+    def test_get_critical_validators_empty_registry(self, registry: ValidatorRegistry) -> None:
         """Test getting critical validators from empty registry."""
         critical_validators = registry.get_critical_validators()
 
@@ -303,9 +299,7 @@ class TestValidatorRegistryGetCriticalValidators:
 
         assert critical_validators == []
 
-    def test_get_critical_validators_multiple_critical(
-        self, registry: ValidatorRegistry
-    ) -> None:
+    def test_get_critical_validators_multiple_critical(self, registry: ValidatorRegistry) -> None:
         """Test getting multiple critical validators."""
         # Create multiple critical validators
         validator1 = MagicMock(spec=Validator)

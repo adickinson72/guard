@@ -1,6 +1,7 @@
 """Datadog adapter implementing MetricsProvider interface."""
 
 from datetime import datetime
+from typing import Any
 
 from guard.clients.datadog_client import DatadogClient
 from guard.interfaces.exceptions import MetricsProviderError
@@ -181,7 +182,7 @@ class DatadogAdapter(MetricsProvider):
 
     async def check_active_alerts(
         self, tags: dict[str, str] | None = None
-    ) -> tuple[bool, list[dict[str, any]]]:
+    ) -> tuple[bool, list[dict[str, Any]]]:
         """Check for active alerts/monitors.
 
         Args:
@@ -205,7 +206,7 @@ class DatadogAdapter(MetricsProvider):
             logger.error("check_active_alerts_failed", error=str(e))
             raise MetricsProviderError(f"Failed to check active alerts: {e}") from e
 
-    async def get_monitor_status(self, monitor_id: str) -> dict[str, any]:
+    async def get_monitor_status(self, monitor_id: str) -> dict[str, Any]:
         """Get status of a specific monitor.
 
         Args:
@@ -225,7 +226,7 @@ class DatadogAdapter(MetricsProvider):
 
     async def query_raw(
         self, query: str, start_time: datetime, end_time: datetime
-    ) -> dict[str, any]:
+    ) -> dict[str, Any]:
         """Execute a raw Datadog query.
 
         Args:

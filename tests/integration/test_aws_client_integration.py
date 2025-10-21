@@ -40,9 +40,7 @@ class TestAWSClientIntegration:
         # Should return a list (may be empty if no clusters in region)
         assert isinstance(clusters, list)
 
-    def test_get_eks_cluster_info_not_found(
-        self, aws_test_region: str, skip_if_no_aws_credentials
-    ):
+    def test_get_eks_cluster_info_not_found(self, aws_test_region: str, skip_if_no_aws_credentials):
         """Test getting cluster info for non-existent cluster raises error."""
         client = AWSClient(region=aws_test_region)
 
@@ -166,9 +164,7 @@ class TestAWSClientCrossAccountIntegration:
     ):
         """Test accessing EKS cluster in another account via role assumption."""
         if not aws_test_role_arn:
-            pytest.skip(
-                "AWS_TEST_ROLE_ARN not set. Set this to test cross-account access."
-            )
+            pytest.skip("AWS_TEST_ROLE_ARN not set. Set this to test cross-account access.")
 
         client = AWSClient(region=aws_test_region)
 

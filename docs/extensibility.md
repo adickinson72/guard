@@ -16,7 +16,7 @@ This document explains how GUARD (GitOps Upgrade Automation with Rollback Detect
 
 GUARD's core design is fundamentally service-agnostic. While it was originally built for Istio upgrades, the underlying architecture can be adapted to automate safe, progressive upgrades for any service that meets these criteria:
 
-- **GitOps-managed**: Confguardration stored in Git and deployed via GitOps tools (Flux, ArgoCD)
+- **GitOps-managed**: Configuration stored in Git and deployed via GitOps tools (Flux, ArgoCD)
 - **Kubernetes-native**: Runs on Kubernetes (EKS, GKE, AKS, etc.)
 - **Observable**: Health and performance metrics available via kubectl and/or monitoring systems (Datadog, Prometheus, etc.)
 
@@ -24,7 +24,7 @@ GUARD's core design is fundamentally service-agnostic. While it was originally b
 
 1. **Generic Workflow**: Pre-checks → GitOps MR → Validation → Rollback
 2. **Pluggable Validation**: Custom health checks can be added without modifying core logic
-3. **Confguardration-Driven**: Service-specific behavior defined in YAML config
+3. **Configuration-Driven**: Service-specific behavior defined in YAML config
 4. **Abstract Interfaces**: Key components use abstract base classes
 
 ## Architecture for Extensibility
@@ -64,13 +64,13 @@ GUARD's core design is fundamentally service-agnostic. While it was originally b
 ┌─────────────────────────────────────────────────────────────┐
 │  GitOps Manager (Generic)                                   │
 │  • Updates any Flux/ArgoCD resource                         │
-│  • Confguardrable file patterns                               │
+│  • Configurable file patterns                               │
 └─────────────────────────────────────────────────────────────┘
                       ↓
 ┌─────────────────────────────────────────────────────────────┐
 │  Validation Engine (Generic)                                │
 │  • Post-upgrade metrics (pluggable)                         │
-│  • Service-specific thresholds (confguardrable)               │
+│  • Service-specific thresholds (configurable)               │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -116,7 +116,7 @@ class ServiceProvider(ABC):
         file_path: Path,
         target_version: str
     ) -> None:
-        """Update GitOps confguardration files."""
+        """Update GitOps configuration files."""
         pass
 
     @abstractmethod
@@ -240,7 +240,7 @@ class PromtailProvider(ServiceProvider):
 
 #### 2. Register the Provider
 
-Add provider registration to confguardration:
+Add provider registration to configuration:
 
 ```yaml
 # config.yaml
@@ -249,7 +249,7 @@ service_provider:
   module: guard.providers.promtail
   class: PromtailProvider
 
-# Service-specific confguardration
+# Service-specific configuration
 promtail:
   daemonset_name: promtail
   namespace: logging
@@ -478,7 +478,7 @@ Tasks:
 2. Extract Istio-specific logic into `IstioProvider`
 3. Refactor `PreCheckEngine` to use provider pattern
 4. Refactor `ValidationEngine` to use provider pattern
-5. Update confguardration schema to support multiple providers
+5. Update configuration schema to support multiple providers
 6. Add provider factory for dynamic loading
 7. Update tests to work with provider abstraction
 
@@ -486,7 +486,7 @@ Tasks:
 - `src/guard/providers/base.py` - Abstract interface
 - `src/guard/providers/istio.py` - Istio implementation
 - `src/guard/providers/factory.py` - Provider factory
-- Updated confguardration schema
+- Updated configuration schema
 - Comprehensive tests
 
 ### Phase 2: Promtail/Loki Extension (1-2 weeks)
@@ -496,7 +496,7 @@ Tasks:
 Tasks:
 1. Implement `PromtailProvider`
 2. Define Promtail-specific validation logic
-3. Create confguardration templates
+3. Create configuration templates
 4. Add integration tests
 5. Document usage
 
@@ -569,14 +569,14 @@ Tasks:
 **Goal**: Support upgrading multiple services in coordinated fashion
 
 Tasks:
-1. Multi-service batch confguardration
+1. Multi-service batch configuration
 2. Dependency management (upgrade A before B)
 3. Cross-service validation
 4. Coordinated rollback
 
 **Deliverables**:
 - Multi-service upgrade orchestration
-- Enhanced confguardration schema
+- Enhanced configuration schema
 - Dependency graph resolver
 
 ## Example: Extending for Promtail/Loki
@@ -798,12 +798,12 @@ class PromtailProvider(ServiceProvider):
         return cluster.get("previous_promtail_version", "6.15.0")
 ```
 
-### 2. Confguardration
+### 2. Configuration
 
 ```yaml
 # ~/.guard/promtail-config.yaml
 
-# Service provider confguardration
+# Service provider configuration
 service_provider:
   type: promtail
   module: guard.providers.promtail
@@ -821,12 +821,12 @@ promtail:
     dropped_entries_increase_percentage: 100  # Allow 2x increase in drops
     soak_period_minutes: 30
 
-# Datadog confguardration (for metrics)
+# Datadog configuration (for metrics)
 datadog:
   api_key_secret: guard/datadog-credentials
   app_key_secret: guard/datadog-credentials
 
-# GitLab confguardration
+# GitLab configuration
 gitlab:
   url: https://gitlab.company.com
   token_secret: guard/gitlab-token
@@ -852,7 +852,7 @@ batches:
 ### 3. Usage
 
 ```bash
-# Validate confguardration
+# Validate configuration
 guard validate --config ~/.guard/promtail-config.yaml
 
 # List clusters in batch
@@ -903,7 +903,7 @@ Add Promtail-specific metadata to cluster registry:
 
 ## Conclusion
 
-GUARD's architecture is fundamentally extensible. By abstracting service-specific logic into pluggable providers and making validation confguardrable, GUARD can be adapted to automate safe upgrades for any Kubernetes-native service that can be validated via kubectl and monitoring metrics.
+GUARD's architecture is fundamentally extensible. By abstracting service-specific logic into pluggable providers and making validation configurable, GUARD can be adapted to automate safe upgrades for any Kubernetes-native service that can be validated via kubectl and monitoring metrics.
 
 The roadmap outlines a clear path from the current Istio-specific implementation to a general-purpose GitOps upgrade automation tool. Starting with Promtail/Loki and Datadog Agent as the first extension targets provides a pragmatic approach to proving the extensibility pattern while delivering immediate value.
 

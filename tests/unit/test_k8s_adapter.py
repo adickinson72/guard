@@ -33,14 +33,10 @@ class TestKubernetesAdapterInit:
         mock_client = MagicMock()
         mock_k8s_client_class.return_value = mock_client
 
-        adapter = KubernetesAdapter(
-            kubeconfig_path="/home/user/.kube/config",
-            context="production"
-        )
+        KubernetesAdapter(kubeconfig_path="/home/user/.kube/config", context="production")
 
         mock_k8s_client_class.assert_called_once_with(
-            kubeconfig_path="/home/user/.kube/config",
-            context="production"
+            kubeconfig_path="/home/user/.kube/config", context="production"
         )
 
     @patch("guard.adapters.k8s_adapter.KubernetesClient")
@@ -70,7 +66,7 @@ class TestKubernetesAdapterGetNodes:
         mock_node1.metadata.name = "node-1"
         mock_node1.status.conditions = [
             MagicMock(type="Ready", status="True"),
-            MagicMock(type="MemoryPressure", status="False")
+            MagicMock(type="MemoryPressure", status="False"),
         ]
         mock_node1.status.capacity = {"cpu": "4", "memory": "16Gi"}
         mock_node1.status.allocatable = {"cpu": "3.5", "memory": "14Gi"}
@@ -232,14 +228,10 @@ class TestKubernetesAdapterGetPods:
 
         adapter = KubernetesAdapter()
 
-        await adapter.get_pods(
-            namespace="default",
-            label_selector="app=nginx,version=v1"
-        )
+        await adapter.get_pods(namespace="default", label_selector="app=nginx,version=v1")
 
         mock_client.get_pods.assert_called_once_with(
-            namespace="default",
-            label_selector="app=nginx,version=v1"
+            namespace="default", label_selector="app=nginx,version=v1"
         )
 
     @pytest.mark.asyncio
@@ -273,7 +265,9 @@ class TestKubernetesAdapterCheckPodsReady:
 
         all_ready, unready = await adapter.check_pods_ready(namespace="default")
 
-        mock_client.check_pods_ready.assert_called_once_with(namespace="default", label_selector=None)
+        mock_client.check_pods_ready.assert_called_once_with(
+            namespace="default", label_selector=None
+        )
         assert all_ready is True
         assert unready == []
 
@@ -288,8 +282,7 @@ class TestKubernetesAdapterCheckPodsReady:
         adapter = KubernetesAdapter()
 
         all_ready, unready = await adapter.check_pods_ready(
-            namespace="istio-system",
-            label_selector="app=istiod"
+            namespace="istio-system", label_selector="app=istiod"
         )
 
         assert all_ready is False
@@ -608,10 +601,7 @@ class TestKubernetesAdapterExecInPod:
     async def test_exec_in_pod_success(self, mock_k8s_client_class: MagicMock) -> None:
         """Test successful command execution in pod."""
         mock_client = MagicMock()
-        mock_client.exec_in_pod.return_value = {
-            "stdout": "Command output",
-            "stderr": ""
-        }
+        mock_client.exec_in_pod.return_value = {"stdout": "Command output", "stderr": ""}
         mock_k8s_client_class.return_value = mock_client
 
         adapter = KubernetesAdapter()
@@ -619,14 +609,14 @@ class TestKubernetesAdapterExecInPod:
         result = await adapter.exec_in_pod(
             namespace="default",
             pod_name="nginx-12345-abcde",
-            command=["cat", "/etc/nginx/nginx.conf"]
+            command=["cat", "/etc/nginx/nginx.conf"],
         )
 
         mock_client.exec_in_pod.assert_called_once_with(
             namespace="default",
             pod_name="nginx-12345-abcde",
             command=["cat", "/etc/nginx/nginx.conf"],
-            container=None
+            container=None,
         )
         assert result["stdout"] == "Command output"
         assert result["stderr"] == ""
@@ -641,18 +631,18 @@ class TestKubernetesAdapterExecInPod:
 
         adapter = KubernetesAdapter()
 
-        result = await adapter.exec_in_pod(
+        await adapter.exec_in_pod(
             namespace="istio-system",
             pod_name="istiod-12345-abcde",
             command=["istioctl", "version"],
-            container="discovery"
+            container="discovery",
         )
 
         mock_client.exec_in_pod.assert_called_once_with(
             namespace="istio-system",
             pod_name="istiod-12345-abcde",
             command=["istioctl", "version"],
-            container="discovery"
+            container="discovery",
         )
 
     @pytest.mark.asyncio
@@ -667,9 +657,7 @@ class TestKubernetesAdapterExecInPod:
 
         with pytest.raises(KubernetesProviderError) as exc_info:
             await adapter.exec_in_pod(
-                namespace="default",
-                pod_name="nonexistent-pod",
-                command=["ls"]
+                namespace="default", pod_name="nonexistent-pod", command=["ls"]
             )
 
         assert "Failed to exec in pod nonexistent-pod" in str(exc_info.value)

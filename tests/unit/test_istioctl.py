@@ -42,9 +42,7 @@ class TestIstioctlWrapperInitialization:
 
     def test_istioctl_wrapper_initialization_with_both(self) -> None:
         """Test IstioctlWrapper initializes with both kubeconfig and context."""
-        wrapper = IstioctlWrapper(
-            kubeconfig_path="/path/to/kubeconfig", context="test-context"
-        )
+        wrapper = IstioctlWrapper(kubeconfig_path="/path/to/kubeconfig", context="test-context")
 
         assert wrapper.kubeconfig_path == "/path/to/kubeconfig"
         assert wrapper.context == "test-context"
@@ -143,7 +141,7 @@ class TestRunCommand:
         mock_result.stdout = "warning output"
         mock_result.stderr = ""
 
-        with patch("subprocess.run", return_value=mock_result) as mock_run:
+        with patch("subprocess.run", return_value=mock_result):
             result = wrapper._run_command(["analyze"], check=False)
 
             assert result.returncode == 1
@@ -454,9 +452,7 @@ class TestIstioctlCommandBuilding:
 
     def test_command_includes_all_flags(self) -> None:
         """Test command includes all specified flags."""
-        wrapper = IstioctlWrapper(
-            kubeconfig_path="/path/to/kubeconfig", context="production"
-        )
+        wrapper = IstioctlWrapper(kubeconfig_path="/path/to/kubeconfig", context="production")
 
         mock_result = Mock()
         mock_result.returncode = 0

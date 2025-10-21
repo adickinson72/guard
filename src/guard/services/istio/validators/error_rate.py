@@ -49,18 +49,21 @@ class IstioErrorRateValidator(Validator):
         violations = []
 
         # Check 5xx error rate
-        baseline_errors = baseline.metrics.get("istio.request.error.5xx.rate", 0)
-        current_errors = current.metrics.get("istio.request.error.5xx.rate", 0)
+        baseline_errors = baseline.metrics.get("istio.request.error.5xx.rate")
+        current_errors = current.metrics.get("istio.request.error.5xx.rate")
 
-        # Check if error rate exceeds maximum
-        if current_errors > thresholds.error_rate_max:
+        # Fail validation if metrics are missing
+        if current_errors is None:
+            violations.append("5xx error rate metrics unavailable - cannot validate error rate")
+        elif current_errors > thresholds.error_rate_max:
+            # Check if error rate exceeds maximum
             violations.append(
                 f"5xx error rate {current_errors:.4f} exceeds maximum "
                 f"{thresholds.error_rate_max:.4f}"
             )
 
         # Check if error rate increased significantly
-        if baseline_errors > 0:
+        if baseline_errors is not None and current_errors is not None and baseline_errors > 0:
             increase_ratio = current_errors / baseline_errors
 
             if increase_ratio > 2.0:  # More than 2x increase
@@ -70,10 +73,13 @@ class IstioErrorRateValidator(Validator):
                 )
 
         # Check total request count didn't drop significantly
-        baseline_requests = baseline.metrics.get("istio.request.total.rate", 0)
-        current_requests = current.metrics.get("istio.request.total.rate", 0)
+        baseline_requests = baseline.metrics.get("istio.request.total.rate")
+        current_requests = current.metrics.get("istio.request.total.rate")
 
-        if baseline_requests > 0:
+        # Fail validation if metrics are missing
+        if baseline_requests is None or current_requests is None:
+            violations.append("Request rate metrics unavailable - cannot validate request volume")
+        elif baseline_requests > 0:
             drop_percent = ((baseline_requests - current_requests) / baseline_requests) * 100
 
             if drop_percent > 20:  # 20% drop threshold

@@ -2,28 +2,24 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from guard.core.models import CheckResult, ClusterConfig
+
+if TYPE_CHECKING:
+    from guard.interfaces.cloud_provider import CloudProvider
+    from guard.interfaces.kubernetes_provider import KubernetesProvider
+    from guard.interfaces.metrics_provider import MetricsProvider
 
 
 @dataclass
 class CheckContext:
     """Context passed to health checks containing dependencies."""
 
-    cloud_provider: "CloudProvider"  # type: ignore
-    kubernetes_provider: "KubernetesProvider"  # type: ignore
-    metrics_provider: "MetricsProvider"  # type: ignore
+    cloud_provider: "CloudProvider"
+    kubernetes_provider: "KubernetesProvider"
+    metrics_provider: "MetricsProvider"
     extra_context: dict[str, Any]
-
-
-# Forward references for type checking
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from guard.interfaces.cloud_provider import CloudProvider
-    from guard.interfaces.kubernetes_provider import KubernetesProvider
-    from guard.interfaces.metrics_provider import MetricsProvider
 
 
 class Check(ABC):

@@ -144,9 +144,9 @@ aws secretsmanager create-secret \
     --region us-east-1
 ```
 
-### Step 3: Create Confguardration File
+### Step 3: Create Configuration File
 
-Create GUARD confguardration directory and file:
+Create GUARD configuration directory and file:
 
 ```bash
 # Create config directory
@@ -155,7 +155,7 @@ mkdir -p ~/.guard
 # Copy example config
 cp examples/config.yaml.example ~/.guard/config.yaml
 
-# Edit confguardration
+# Edit configuration
 nano ~/.guard/config.yaml
 ```
 
@@ -232,14 +232,14 @@ guard registry import --file clusters.json
 
 ### Step 5: Validate Setup
 
-Verify everything is confguardred correctly:
+Verify everything is configured correctly:
 
 ```bash
-# Validate confguardration
+# Validate configuration
 guard validate --config ~/.guard/config.yaml
 
 # Expected output:
-# ✓ Confguardration file is valid
+# ✓ Configuration file is valid
 # ✓ AWS credentials are valid
 # ✓ DynamoDB table accessible
 # ✓ GitLab credentials valid
@@ -280,7 +280,7 @@ guard run --batch test --target-version 1.20.0
 GUARD - GitOps Upgrade Automation with Rollback Detection
 ===========================
 
-Loading confguardration from ~/.guard/config.yaml
+Loading configuration from ~/.guard/config.yaml
 Found 1 cluster(s) in batch 'test'
 
 Running pre-upgrade health checks...
@@ -288,7 +288,7 @@ Running pre-upgrade health checks...
 Cluster: eks-test-us-east-1
   ✓ Kubernetes API healthy
   ✓ Istio control plane healthy
-  ✓ No confguardration issues found
+  ✓ No configuration issues found
   ✓ Datadog metrics within normal range
   ✓ No active alerts
 
@@ -401,7 +401,7 @@ Cluster eks-test-us-east-1 is now running Istio 1.20.0
 Verify the upgrade in your cluster:
 
 ```bash
-# Assume role and confguardre kubectl
+# Assume role and configure kubectl
 aws eks update-kubeconfig --name eks-test-us-east-1 --region us-east-1
 
 # Check Istio version
@@ -431,7 +431,7 @@ GUARD follows a structured workflow:
 
 ### 2. GitOps Phase
 - Creates feature branch in GitLab
-- Updates Flux HelmRelease confguardrations
+- Updates Flux HelmRelease configurations
 - Creates merge request for human review
 - **Human Gate**: You review and merge
 
@@ -502,7 +502,7 @@ guard run --batch prod-wave-2 --target-version 1.20.0
 guard monitor --batch prod-wave-2 --soak-period 120
 ```
 
-### Customize Confguardration
+### Customize Configuration
 
 Explore advanced options:
 
@@ -511,7 +511,7 @@ Explore advanced options:
 - **Notifications**: Set up Slack/PagerDuty alerts
 - **Batch ordering**: Define dependencies between batches
 
-See [Confguardration Guide](confguardration.md) for details.
+See [Configuration Guide](configuration.md) for details.
 
 ### Set Up Automation
 

@@ -1,4 +1,3 @@
----
 # ClusterRole for GUARD to manage Istio upgrades across the cluster
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole

@@ -381,7 +381,7 @@ def create_merge_request(
 
     Raises:
         GitLabError: If MR creation fails
-        ConfguardrationError: If GitLab config is invalid
+        ConfigurationError: If GitLab config is invalid
     """
     pass
 ```
@@ -416,7 +416,7 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/):
 # Feature
 git commit -m "feat(validation): add custom Datadog query support
 
-Allow users to define custom Datadog queries in confguardration
+Allow users to define custom Datadog queries in configuration
 for validation checks. Queries support template variables for
 cluster name and environment.
 
@@ -438,7 +438,7 @@ Add Poetry installation steps and update pip install command."
 # Breaking change
 git commit -m "feat(config)!: change config file format to YAML
 
-BREAKING CHANGE: Confguardration files must now be in YAML format
+BREAKING CHANGE: Configuration files must now be in YAML format
 instead of JSON. Migration script provided in scripts/migrate-config.py"
 ```
 

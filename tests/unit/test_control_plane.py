@@ -217,9 +217,7 @@ class TestControlPlaneCheckFailure:
         mock_context: CheckContext,
     ) -> None:
         """Test that check fails on timeout."""
-        mock_context.kubernetes_provider.get_nodes.side_effect = TimeoutError(
-            "Request timed out"
-        )
+        mock_context.kubernetes_provider.get_nodes.side_effect = TimeoutError("Request timed out")
 
         result = await control_plane_check.execute(sample_cluster_config, mock_context)
 

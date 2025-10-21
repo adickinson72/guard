@@ -81,7 +81,8 @@ class SecretsManager:
         """
         try:
             secret_string = self.get_secret(secret_name)
-            return json.loads(secret_string)
+            result: dict[str, Any] = json.loads(secret_string)
+            return result
         except json.JSONDecodeError as e:
             logger.error(
                 "secret_json_parse_failed",

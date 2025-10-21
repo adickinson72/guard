@@ -117,7 +117,7 @@ guard monitor --batch prod-wave-1 \
     --latency-threshold 5
 ```
 
-Or confguardre in YAML:
+Or configure in YAML:
 
 ```yaml
 # ~/.guard/config.yaml
@@ -217,7 +217,7 @@ guard check --cluster eks-prod-us-east-1-api
 # Running health checks...
 # ✓ Kubernetes API healthy
 # ✓ Istio control plane healthy
-# ✓ No confguardration issues (istioctl analyze)
+# ✓ No configuration issues (istioctl analyze)
 # ✓ Datadog metrics normal
 # ✓ No active alerts
 ```
@@ -288,16 +288,16 @@ guard validate-cluster eks-prod-us-east-1-api \
     --baseline-file baseline-metrics.json
 ```
 
-## Confguardration Validation
+## Configuration Validation
 
-Validate your confguardration before running upgrades:
+Validate your configuration before running upgrades:
 
 ```bash
 # Validate config file
 guard validate --config ~/.guard/config.yaml
 
 # Output:
-# ✓ Confguardration file is valid
+# ✓ Configuration file is valid
 # ✓ AWS credentials valid
 # ✓ DynamoDB table accessible: guard-cluster-registry
 # ✓ GitLab credentials valid
@@ -310,7 +310,7 @@ guard validate --config ~/.guard/config.yaml
 # ✓ All batches have valid clusters
 # ✓ Flux config paths exist in GitLab repos
 #
-# Confguardration is valid!
+# Configuration is valid!
 ```
 
 ## Export Health Report
@@ -362,7 +362,7 @@ guard run --batch prod-wave-1 --target-version 1.20.0
 
 ## Notification Integration
 
-Confguardre notifications for upgrade events:
+Configure notifications for upgrade events:
 
 ```yaml
 # ~/.guard/config.yaml
