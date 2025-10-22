@@ -8,10 +8,56 @@ metadata:
     app.kubernetes.io/name: guard
     app.kubernetes.io/component: automation
 data:
-  # Add your GUARD configuration here
-  # Example:
-  # config.yaml: |
-  #   clusters:
-  #     - cluster_id: "prod-us-east-1"
-  #       environment: "production"
-  #       ...
+  config.yaml: |
+    # GUARD Configuration File
+    # Replace with your actual production values
+    
+    # AWS Settings
+    aws:
+      region: us-east-1
+      # profile: default  # Optional: AWS profile (uncomment if needed)
+      dynamodb:
+        table_name: guard-cluster-registry
+        region: us-east-1
+      secrets_manager:
+        gitlab_token_secret: guard/gitlab-token
+        datadog_credentials_secret: guard/datadog-credentials
+    
+    # GitLab Settings
+    gitlab:
+      url: https://gitlab.com  # Replace with your GitLab instance URL
+      default_target_branch: main
+    
+    # Datadog Settings
+    datadog:
+      site: datadoghq.com  # or datadoghq.eu, us3.datadoghq.com, etc.
+    
+    # Validation Settings
+    validation:
+      soak_period_minutes: 60
+      flux_sync_timeout_minutes: 15
+      thresholds:
+        latency_increase_percent: 10
+        error_rate_max: 0.001
+        resource_increase_percent: 50
+    
+    # Rollback Settings
+    rollback:
+      auto_create_mr: true
+      require_manual_approval: true
+      notification:
+        enabled: false
+        # webhook_url: https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+    
+    # LLM Settings (Optional - disabled by default)
+    llm:
+      enabled: false
+      # provider: openai
+      # model: gpt-4
+      # api_key_secret: guard/llm-api-key
+    
+    # Logging
+    logging:
+      level: INFO
+      format: json
+      output: stdout

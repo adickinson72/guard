@@ -94,7 +94,7 @@ class TestQueryMetrics:
         assert result["series"][0]["metric"] == "istio.request.duration.milliseconds.avg"
 
         datadog_client.metrics_api.query_metrics.assert_called_once_with(
-            from_=1234567890,
+            _from=1234567890,
             to=1234567900,
             query="avg:istio.request.duration.milliseconds{*}",
         )
@@ -122,7 +122,7 @@ class TestQueryMetrics:
 
         # Verify datetime was converted to Unix timestamp
         call_args = datadog_client.metrics_api.query_metrics.call_args
-        assert isinstance(call_args[1]["from_"], int)
+        assert isinstance(call_args[1]["_from"], int)
         assert isinstance(call_args[1]["to"], int)
 
     def test_query_metrics_api_exception(self, datadog_client: DatadogClient) -> None:

@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install kubectl (pinned version with checksum verification)
 ENV KUBECTL_VERSION=1.31.3
-ENV KUBECTL_SHA256=0aa9e69dbb697ad7ca47f0b4aaf8ca508f6d95f43a8ef80e4c0a5cd0d3cfa3a9
+ENV KUBECTL_SHA256=981f6b49577068bc174275184d8ee7105d8e54f40733792c519cd85023984c0f
 RUN curl -LO "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
     && echo "${KUBECTL_SHA256}  kubectl" | sha256sum -c - \
     && install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl \
@@ -23,7 +23,7 @@ RUN curl -LO "https://dl.k8s.io/release/v${KUBECTL_VERSION}/bin/linux/amd64/kube
 
 # Install istioctl (pinned version with checksum verification)
 ENV ISTIO_VERSION=1.20.0
-ENV ISTIOCTL_SHA256=a2e2a0a3e0d0c2c4f6f1e8f0a0f0a0f0a0f0a0f0a0f0a0f0a0f0a0f0a0f0a0f0
+ENV ISTIOCTL_SHA256=d1efd41672395f78996c6614ba3148e4a53ac99bcf61d088653f1fb02d48d089
 RUN curl -L "https://github.com/istio/istio/releases/download/${ISTIO_VERSION}/istioctl-${ISTIO_VERSION}-linux-amd64.tar.gz" -o istioctl.tar.gz \
     && tar -xzf istioctl.tar.gz \
     && install -o root -g root -m 0755 istioctl /usr/local/bin/istioctl \

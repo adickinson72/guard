@@ -28,8 +28,8 @@ spec:
           type: RuntimeDefault
       containers:
       - name: guard
-        # Replace with your container registry and image tag
-        image: <YOUR_REGISTRY>/guard:latest
+        # GHCR public image - replace with your version if needed
+        image: ghcr.io/adickinson72/guard:v0.2.0
         imagePullPolicy: Always
         # Keep pod running for manual execution
         command: ["/bin/sleep"]
