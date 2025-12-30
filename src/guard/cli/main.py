@@ -200,12 +200,23 @@ def cli(ctx: click.Context, config: str) -> None:
 
 @cli.command()
 @click.option("--batch", required=True, help="Batch name to upgrade")
-@click.option("--target-version", required=True, help="Target Istio version")
+@click.option("--target-version", required=True, help="Target service version")
+@click.option(
+    "--service",
+    type=click.Choice(["istio", "thanos", "prometheus"]),
+    default="istio",
+    help="Service type to upgrade (default: istio)",
+)
 @click.option("--dry-run", is_flag=True, help="Perform dry run without creating MR")
 @click.option("--max-concurrent", type=int, default=5, help="Max concurrent cluster operations")
 @click.pass_context
 def run(
-    ctx: click.Context, batch: str, target_version: str, dry_run: bool, max_concurrent: int
+    ctx: click.Context,
+    batch: str,
+    target_version: str,
+    service: str,
+    dry_run: bool,
+    max_concurrent: int,
 ) -> None:
     """Run pre-checks and create upgrade MR for a batch."""
     import asyncio
@@ -213,14 +224,21 @@ def run(
     from guard.adapters.k8s_adapter import KubernetesAdapter
     from guard.checks.check_orchestrator import CheckOrchestrator
     from guard.checks.check_registry import CheckRegistry
+    from guard.core.models import ServiceType
     from guard.gitops.gitops_orchestrator import GitOpsOrchestrator
     from guard.interfaces.check import CheckContext
-    from guard.services.istio.istio_service import IstioService
+    from guard.services import ServiceRegistry, register_all_services
     from guard.utils.logging import get_logger
 
     logger = get_logger(__name__)
 
+    # Register all services and get the requested one
+    register_all_services()
+    service_type = ServiceType(service)
+    service_impl = ServiceRegistry.get(service_type)
+
     console.print("[bold blue]GUARD Run Command[/bold blue]")
+    console.print(f"Service: {service_impl.service_name}")
     console.print(f"Batch: {batch}")
     console.print(f"Target Version: {target_version}")
     console.print(f"Dry Run: {dry_run}")
@@ -264,9 +282,8 @@ def run(
                     # Initialize check registry and orchestrator
                     check_registry = CheckRegistry()
 
-                    # Register Istio checks
-                    istio_service = IstioService()
-                    istio_service.register_checks(check_registry)
+                    # Register checks for the selected service
+                    service_impl.register_checks(check_registry)
 
                     # Create orchestrator with registry
                     check_orchestrator = CheckOrchestrator(registry=check_registry)
@@ -315,7 +332,11 @@ def run(
                         # Update cluster metadata with MR information
                         cluster.metadata.mr_created_at = mr.created_at
                         cluster.metadata.mr_url = mr.web_url
-                        cluster.target_istio_version = target_version
+
+                        # Update service version target
+                        sv = cluster.get_service_version(service_type)
+                        if sv:
+                            sv.target_version = target_version
                         registry.put_cluster(cluster)
 
                         console.print(f"  [green]✓ MR created: {mr.web_url}[/green]")
@@ -426,25 +447,39 @@ def run(
 
 @cli.command()
 @click.option("--batch", required=True, help="Batch name to monitor")
+@click.option(
+    "--service",
+    type=click.Choice(["istio", "thanos", "prometheus"]),
+    default="istio",
+    help="Service type to monitor (default: istio)",
+)
 @click.option("--soak-period", type=int, default=60, help="Soak period in minutes")
 @click.option("--max-concurrent", type=int, default=5, help="Max concurrent cluster monitoring")
 @click.pass_context
-def monitor(ctx: click.Context, batch: str, soak_period: int, max_concurrent: int) -> None:
+def monitor(
+    ctx: click.Context, batch: str, service: str, soak_period: int, max_concurrent: int
+) -> None:
     """Monitor post-upgrade validation for a batch."""
     import asyncio
 
     from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 
-    from guard.core.models import ClusterStatus, ValidationThresholds
+    from guard.core.models import ClusterStatus, ServiceType, ValidationThresholds
     from guard.rollback.engine import RollbackEngine
-    from guard.services.istio.istio_service import IstioService
+    from guard.services import ServiceRegistry, register_all_services
     from guard.utils.logging import get_logger
     from guard.validation.validation_orchestrator import ValidationOrchestrator
     from guard.validation.validator_registry import ValidatorRegistry
 
     logger = get_logger(__name__)
 
+    # Register all services and get the requested one
+    register_all_services()
+    service_type = ServiceType(service)
+    service_impl = ServiceRegistry.get(service_type)
+
     console.print("[bold green]GUARD Monitor Command[/bold green]")
+    console.print(f"Service: {service_impl.service_name}")
     console.print(f"Batch: {batch}")
     console.print(f"Soak Period: {soak_period} minutes")
     console.print(f"Max Concurrent: {max_concurrent}\n")
@@ -478,8 +513,7 @@ def monitor(ctx: click.Context, batch: str, soak_period: int, max_concurrent: in
 
             # Initialize validation components
             validator_registry = ValidatorRegistry()
-            istio_service = IstioService()
-            istio_service.register_validators(validator_registry)
+            service_impl.register_validators(validator_registry)
 
             validation_orchestrator = ValidationOrchestrator(
                 registry=validator_registry,
@@ -572,10 +606,19 @@ def monitor(ctx: click.Context, batch: str, soak_period: int, max_concurrent: in
                                 if not result.passed
                             }
 
+                            # Get version info for the service
+                            sv = cluster.get_service_version(service_type)
+                            current_ver = (
+                                sv.target_version if sv and sv.target_version else "unknown"
+                            )
+                            previous_ver = (
+                                sv.current_version if sv and sv.current_version else "unknown"
+                            )
+
                             mr_url = await rollback_engine.create_rollback_mr(
                                 cluster=cluster,
-                                current_version=cluster.target_istio_version or "unknown",
-                                previous_version=cluster.current_istio_version,
+                                current_version=current_ver,
+                                previous_version=previous_ver,
                                 failure_reason="Post-upgrade validation failed",
                                 failure_metrics=failure_metrics,
                             )
@@ -678,19 +721,32 @@ def monitor(ctx: click.Context, batch: str, soak_period: int, max_concurrent: in
 @cli.command()
 @click.option("--batch", required=True, help="Batch name to rollback")
 @click.option("--reason", required=True, help="Reason for manual rollback")
+@click.option(
+    "--service",
+    type=click.Choice(["istio", "thanos", "prometheus"]),
+    default="istio",
+    help="Service to rollback (default: istio)",
+)
 @click.pass_context
-def rollback(ctx: click.Context, batch: str, reason: str) -> None:
+def rollback(ctx: click.Context, batch: str, reason: str, service: str) -> None:
     """Trigger manual rollback for a batch."""
     import asyncio
 
-    from guard.core.models import ClusterStatus
+    from guard.core.models import ClusterStatus, ServiceType
     from guard.rollback.engine import RollbackEngine
+    from guard.services import ServiceRegistry, register_all_services
     from guard.utils.logging import get_logger
 
     logger = get_logger(__name__)
 
+    # Register all services and get the requested one
+    register_all_services()
+    service_type = ServiceType(service)
+    service_impl = ServiceRegistry.get(service_type)
+
     console.print("[bold red]GUARD Rollback Command[/bold red]")
     console.print(f"Batch: {batch}")
+    console.print(f"Service: {service}")
     console.print(f"Reason: {reason}\n")
 
     async def _rollback_batch() -> None:
@@ -709,7 +765,7 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
 
             console.print(f"Found {len(clusters)} cluster(s) in batch {batch}\n")
 
-            # Initialize rollback engine
+            # Initialize rollback engine with service-specific config updater
             from guard.clients.gitlab_client import GitLabClient
 
             gitlab_client = GitLabClient(
@@ -718,7 +774,8 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
             )
             rollback_engine = RollbackEngine(
                 gitlab_client=gitlab_client,
-                config_updater=guard_ctx.helm_updater,
+                config_updater=service_impl.get_config_updater(),
+                service_type=service_type,
             )
 
             # Rollback each cluster
@@ -726,11 +783,23 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
                 console.print(f"[bold]Rolling back cluster: {cluster.cluster_id}[/bold]")
 
                 try:
+                    # Get service version info
+                    service_version = cluster.get_service_version(service_type)
+                    if not service_version:
+                        console.print(
+                            f"  [yellow]⚠ No {service} version info for cluster, skipping[/yellow]\n"
+                        )
+                        continue
+
+                    current_version = (
+                        service_version.target_version or service_version.current_version
+                    )
+                    previous_version = service_version.current_version
+
                     mr_url = await rollback_engine.create_rollback_mr(
                         cluster=cluster,
-                        current_version=cluster.target_istio_version
-                        or cluster.current_istio_version,
-                        previous_version=cluster.current_istio_version,
+                        current_version=current_version,
+                        previous_version=previous_version,
                         failure_reason=f"Manual rollback: {reason}",
                         failure_metrics=None,
                     )
@@ -771,9 +840,19 @@ def rollback(ctx: click.Context, batch: str, reason: str) -> None:
 @click.option("--batch", help="Filter by batch name")
 @click.option("--environment", help="Filter by environment")
 @click.option("--format", type=click.Choice(["table", "json"]), default="table")
+@click.option(
+    "--service",
+    type=click.Choice(["istio", "thanos", "prometheus"]),
+    default="istio",
+    help="Service to show version info for (default: istio)",
+)
 @click.pass_context
 def list_clusters(
-    ctx: click.Context, batch: str | None, environment: str | None, format: str
+    ctx: click.Context,
+    batch: str | None,
+    environment: str | None,
+    format: str,
+    service: str,
 ) -> None:
     """List clusters and their status."""
     import asyncio
@@ -781,9 +860,15 @@ def list_clusters(
 
     from rich.table import Table
 
+    from guard.core.models import ServiceType
+
+    # Convert service string to enum
+    service_type = ServiceType(service)
+
     console.print("[bold cyan]GUARD List Command[/bold cyan]")
     console.print(f"Batch Filter: {batch or 'All'}")
-    console.print(f"Environment Filter: {environment or 'All'}\n")
+    console.print(f"Environment Filter: {environment or 'All'}")
+    console.print(f"Service: {service}\n")
 
     async def _list_clusters() -> None:
         try:
@@ -809,7 +894,7 @@ def list_clusters(
                 cluster_dicts = [c.model_dump() for c in clusters]
                 print(json.dumps(cluster_dicts, indent=2, default=str))
             else:
-                table = Table(title=f"GUARD Clusters ({len(clusters)} total)")
+                table = Table(title=f"GUARD Clusters ({len(clusters)} total) - {service.upper()}")
                 table.add_column("Cluster ID", style="cyan")
                 table.add_column("Batch", style="magenta")
                 table.add_column("Environment", style="blue")
@@ -819,12 +904,20 @@ def list_clusters(
 
                 for cluster in clusters:
                     status_color = "green" if cluster.status == "healthy" else "yellow"
+
+                    # Get service version info
+                    service_version = cluster.get_service_version(service_type)
+                    current_version = service_version.current_version if service_version else "-"
+                    target_version = (
+                        service_version.target_version if service_version else None
+                    ) or "-"
+
                     table.add_row(
                         cluster.cluster_id,
                         cluster.batch_id,
                         cluster.environment,
-                        cluster.current_istio_version,
-                        cluster.target_istio_version or "-",
+                        current_version,
+                        target_version,
                         f"[{status_color}]{cluster.status}[/{status_color}]",
                     )
 

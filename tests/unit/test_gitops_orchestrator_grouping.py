@@ -5,57 +5,52 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from guard.core.models import ClusterConfig, ClusterMetadata, DatadogTags
+from guard.core.models import ServiceType
 from guard.gitops.gitops_orchestrator import GitOpsOrchestrator
 from guard.interfaces.exceptions import PartialFailureError
 from guard.interfaces.gitops_provider import MergeRequestInfo
+from tests.conftest import create_cluster_config
 
 
 @pytest.fixture
 def sample_clusters():
     """Create sample cluster configurations."""
     return [
-        ClusterConfig(
+        create_cluster_config(
             cluster_id="cluster-1",
             batch_id="prod-wave-1",
             environment="production",
             region="us-east-1",
             gitlab_repo="devops/k8s-prod",
-            flux_config_path="clusters/prod/istio/helmrelease.yaml",
+            istio_flux_path="clusters/prod/istio/helmrelease.yaml",
             aws_role_arn="arn:aws:iam::123456789:role/eks-cluster-1",
-            current_istio_version="1.19.0",
-            datadog_tags=DatadogTags(cluster="cluster-1", env="prod"),
+            istio_version="1.19.0",
             owner_team="platform",
             owner_handle="platform-team",
-            metadata=ClusterMetadata(),
         ),
-        ClusterConfig(
+        create_cluster_config(
             cluster_id="cluster-2",
             batch_id="prod-wave-1",
             environment="production",
             region="us-west-2",
             gitlab_repo="devops/k8s-prod",
-            flux_config_path="clusters/prod/istio/helmrelease.yaml",  # Same repo+path
+            istio_flux_path="clusters/prod/istio/helmrelease.yaml",  # Same repo+path
             aws_role_arn="arn:aws:iam::123456789:role/eks-cluster-2",
-            current_istio_version="1.19.0",
-            datadog_tags=DatadogTags(cluster="cluster-2", env="prod"),
+            istio_version="1.19.0",
             owner_team="platform",
             owner_handle="platform-team",
-            metadata=ClusterMetadata(),
         ),
-        ClusterConfig(
+        create_cluster_config(
             cluster_id="cluster-3",
             batch_id="prod-wave-2",
             environment="production",
             region="eu-west-1",
             gitlab_repo="devops/k8s-eu",  # Different repo
-            flux_config_path="clusters/prod/istio/helmrelease.yaml",
+            istio_flux_path="clusters/prod/istio/helmrelease.yaml",
             aws_role_arn="arn:aws:iam::123456789:role/eks-cluster-3",
-            current_istio_version="1.19.0",
-            datadog_tags=DatadogTags(cluster="cluster-3", env="prod"),
+            istio_version="1.19.0",
             owner_team="platform",
             owner_handle="platform-team",
-            metadata=ClusterMetadata(),
         ),
     ]
 
@@ -67,6 +62,7 @@ def mock_git_provider():
     provider.create_branch = AsyncMock()
     provider.get_file_content = AsyncMock(return_value="apiVersion: v1\nkind: HelmRelease")
     provider.update_file = AsyncMock()
+    provider.find_merge_request_by_title = AsyncMock(return_value=None)  # No existing MR
     provider.create_merge_request = AsyncMock(
         return_value=MergeRequestInfo(
             id=1,
@@ -103,7 +99,9 @@ class TestGroupClustersByRepoPath:
 
     def test_group_single_cluster(self, sample_clusters):
         """Test grouping single cluster."""
-        grouped = GitOpsOrchestrator.group_clusters_by_repo_path([sample_clusters[0]])
+        grouped = GitOpsOrchestrator.group_clusters_by_repo_path(
+            [sample_clusters[0]], ServiceType.ISTIO
+        )
 
         assert len(grouped) == 1
         key = ("devops/k8s-prod", "clusters/prod/istio/helmrelease.yaml")
@@ -114,7 +112,9 @@ class TestGroupClustersByRepoPath:
     def test_group_clusters_same_repo_and_path(self, sample_clusters):
         """Test grouping clusters with same repo and path."""
         # cluster-1 and cluster-2 share the same repo and path
-        grouped = GitOpsOrchestrator.group_clusters_by_repo_path(sample_clusters[:2])
+        grouped = GitOpsOrchestrator.group_clusters_by_repo_path(
+            sample_clusters[:2], ServiceType.ISTIO
+        )
 
         assert len(grouped) == 1
         key = ("devops/k8s-prod", "clusters/prod/istio/helmrelease.yaml")
@@ -126,7 +126,7 @@ class TestGroupClustersByRepoPath:
     def test_group_clusters_different_repos(self, sample_clusters):
         """Test grouping clusters with different repos."""
         # All three clusters - two share repo+path, one is different
-        grouped = GitOpsOrchestrator.group_clusters_by_repo_path(sample_clusters)
+        grouped = GitOpsOrchestrator.group_clusters_by_repo_path(sample_clusters, ServiceType.ISTIO)
 
         assert len(grouped) == 2
 
@@ -143,7 +143,7 @@ class TestGroupClustersByRepoPath:
 
     def test_group_empty_list(self):
         """Test grouping empty list of clusters."""
-        grouped = GitOpsOrchestrator.group_clusters_by_repo_path([])
+        grouped = GitOpsOrchestrator.group_clusters_by_repo_path([], ServiceType.ISTIO)
 
         assert len(grouped) == 0
         assert grouped == {}
@@ -151,37 +151,33 @@ class TestGroupClustersByRepoPath:
     def test_group_clusters_different_paths_same_repo(self):
         """Test grouping clusters with different paths in same repo."""
         clusters = [
-            ClusterConfig(
+            create_cluster_config(
                 cluster_id="cluster-1",
                 batch_id="prod",
                 environment="production",
                 region="us-east-1",
                 gitlab_repo="devops/k8s-prod",
-                flux_config_path="path/to/config1.yaml",
+                istio_flux_path="path/to/config1.yaml",
                 aws_role_arn="arn:aws:iam::123456789:role/eks-cluster-1",
-                current_istio_version="1.19.0",
-                datadog_tags=DatadogTags(cluster="cluster-1", env="prod"),
+                istio_version="1.19.0",
                 owner_team="platform",
                 owner_handle="platform-team",
-                metadata=ClusterMetadata(),
             ),
-            ClusterConfig(
+            create_cluster_config(
                 cluster_id="cluster-2",
                 batch_id="prod",
                 environment="production",
                 region="us-east-1",
                 gitlab_repo="devops/k8s-prod",  # Same repo
-                flux_config_path="path/to/config2.yaml",  # Different path
+                istio_flux_path="path/to/config2.yaml",  # Different path
                 aws_role_arn="arn:aws:iam::123456789:role/eks-cluster-2",
-                current_istio_version="1.19.0",
-                datadog_tags=DatadogTags(cluster="cluster-2", env="prod"),
+                istio_version="1.19.0",
                 owner_team="platform",
                 owner_handle="platform-team",
-                metadata=ClusterMetadata(),
             ),
         ]
 
-        grouped = GitOpsOrchestrator.group_clusters_by_repo_path(clusters)
+        grouped = GitOpsOrchestrator.group_clusters_by_repo_path(clusters, ServiceType.ISTIO)
 
         # Should create two groups despite same repo
         assert len(grouped) == 2
@@ -288,33 +284,29 @@ class TestCreateUpgradeMrsForBatch:
     async def test_batch_mr_mixed_batches(self, orchestrator, mock_git_provider):
         """Test creating MR for clusters from different batches sharing repo+path."""
         clusters = [
-            ClusterConfig(
+            create_cluster_config(
                 cluster_id="cluster-1",
                 batch_id="batch-a",
                 environment="production",
                 region="us-east-1",
                 gitlab_repo="devops/k8s-prod",
-                flux_config_path="clusters/prod/istio/helmrelease.yaml",
+                istio_flux_path="clusters/prod/istio/helmrelease.yaml",
                 aws_role_arn="arn:aws:iam::123456789:role/eks-cluster-1",
-                current_istio_version="1.19.0",
-                datadog_tags=DatadogTags(cluster="cluster-1", env="prod"),
+                istio_version="1.19.0",
                 owner_team="platform",
                 owner_handle="platform-team",
-                metadata=ClusterMetadata(),
             ),
-            ClusterConfig(
+            create_cluster_config(
                 cluster_id="cluster-2",
                 batch_id="batch-b",  # Different batch
                 environment="production",
                 region="us-west-2",
                 gitlab_repo="devops/k8s-prod",  # Same repo
-                flux_config_path="clusters/prod/istio/helmrelease.yaml",  # Same path
+                istio_flux_path="clusters/prod/istio/helmrelease.yaml",  # Same path
                 aws_role_arn="arn:aws:iam::123456789:role/eks-cluster-2",
-                current_istio_version="1.19.0",
-                datadog_tags=DatadogTags(cluster="cluster-2", env="prod"),
+                istio_version="1.19.0",
                 owner_team="platform",
                 owner_handle="platform-team",
-                metadata=ClusterMetadata(),
             ),
         ]
 

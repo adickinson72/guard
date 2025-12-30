@@ -8,7 +8,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from guard.core.models import CheckResult, ClusterConfig
+from guard.core.models import CheckResult, ClusterConfig, ServiceType
 from guard.interfaces.check import CheckContext
 from guard.services.istio.checks.sidecar_version import IstioSidecarVersionCheck
 
@@ -57,29 +57,38 @@ def sample_check_context(mock_kubernetes_provider: MagicMock) -> CheckContext:
 def create_mock_pod_with_sidecar(name: str, namespace: str, sidecar_image: str) -> MagicMock:
     """Create a mock pod with an Istio sidecar.
 
+    Creates a mock matching the PodInfo dataclass format from kubernetes_provider.
+
     Args:
         name: Pod name
         namespace: Pod namespace
         sidecar_image: Istio proxy container image
 
     Returns:
-        Mock pod object
+        Mock pod object matching PodInfo format
     """
     pod = MagicMock()
-    pod.metadata.name = name
-    pod.metadata.namespace = namespace
+    pod.name = name
+    pod.namespace = namespace
+    pod.ready = True
+    pod.phase = "Running"
+    pod.conditions = {"Ready": "True"}
 
-    # Create istio-proxy container
-    proxy_container = MagicMock()
-    proxy_container.name = "istio-proxy"
-    proxy_container.image = sidecar_image
-
-    # Create app container (non-sidecar)
-    app_container = MagicMock()
-    app_container.name = "app"
-    app_container.image = "myapp:latest"
-
-    pod.spec.containers = [app_container, proxy_container]
+    # Container statuses as list of dicts (PodInfo format)
+    pod.container_statuses = [
+        {
+            "name": "app",
+            "ready": True,
+            "restart_count": 0,
+            "image": "myapp:latest",
+        },
+        {
+            "name": "istio-proxy",
+            "ready": True,
+            "restart_count": 0,
+            "image": sidecar_image,
+        },
+    ]
 
     return pod
 
@@ -87,22 +96,31 @@ def create_mock_pod_with_sidecar(name: str, namespace: str, sidecar_image: str) 
 def create_mock_pod_without_sidecar(name: str, namespace: str) -> MagicMock:
     """Create a mock pod without an Istio sidecar.
 
+    Creates a mock matching the PodInfo dataclass format from kubernetes_provider.
+
     Args:
         name: Pod name
         namespace: Pod namespace
 
     Returns:
-        Mock pod object
+        Mock pod object matching PodInfo format
     """
     pod = MagicMock()
-    pod.metadata.name = name
-    pod.metadata.namespace = namespace
+    pod.name = name
+    pod.namespace = namespace
+    pod.ready = True
+    pod.phase = "Running"
+    pod.conditions = {"Ready": "True"}
 
-    app_container = MagicMock()
-    app_container.name = "app"
-    app_container.image = "myapp:latest"
-
-    pod.spec.containers = [app_container]
+    # Container statuses as list of dicts (PodInfo format)
+    pod.container_statuses = [
+        {
+            "name": "app",
+            "ready": True,
+            "restart_count": 0,
+            "image": "myapp:latest",
+        }
+    ]
 
     return pod
 
@@ -262,21 +280,21 @@ class TestSidecarVersionCheckExecution:
             sample_check_context: CheckContext with mocked dependencies
             mock_kubernetes_provider: Mock KubernetesProvider
         """
+        # Get current Istio version from service versions
+        istio_version = sample_cluster_config.get_service_version(ServiceType.ISTIO)
+        current_version = istio_version.current_version
+
         # Create pods with matching versions
         pods_default = [
-            create_mock_pod_with_sidecar(
-                "pod1", "default", f"istio/proxyv2:{sample_cluster_config.current_istio_version}"
-            ),
-            create_mock_pod_with_sidecar(
-                "pod2", "default", f"istio/proxyv2:{sample_cluster_config.current_istio_version}"
-            ),
+            create_mock_pod_with_sidecar("pod1", "default", f"istio/proxyv2:{current_version}"),
+            create_mock_pod_with_sidecar("pod2", "default", f"istio/proxyv2:{current_version}"),
         ]
 
         pods_app = [
             create_mock_pod_with_sidecar(
                 "pod3",
                 "app-namespace",
-                f"istio/proxyv2:{sample_cluster_config.current_istio_version}",
+                f"istio/proxyv2:{current_version}",
             ),
         ]
 
@@ -307,11 +325,13 @@ class TestSidecarVersionCheckExecution:
             sample_check_context: CheckContext with mocked dependencies
             mock_kubernetes_provider: Mock KubernetesProvider
         """
+        # Get current Istio version from service versions
+        istio_version = sample_cluster_config.get_service_version(ServiceType.ISTIO)
+        current_version = istio_version.current_version
+
         # Create pods with mismatched versions
         pods = [
-            create_mock_pod_with_sidecar(
-                "pod1", "default", f"istio/proxyv2:{sample_cluster_config.current_istio_version}"
-            ),
+            create_mock_pod_with_sidecar("pod1", "default", f"istio/proxyv2:{current_version}"),
             create_mock_pod_with_sidecar("pod2", "default", "istio/proxyv2:1.18.0"),  # Mismatch
             create_mock_pod_with_sidecar("pod3", "default", "istio/proxyv2:1.17.5"),  # Mismatch
         ]
@@ -394,14 +414,14 @@ class TestSidecarVersionCheckExecution:
             sample_check_context: CheckContext with mocked dependencies
             mock_kubernetes_provider: Mock KubernetesProvider
         """
+        # Get current Istio version from service versions
+        istio_version = sample_cluster_config.get_service_version(ServiceType.ISTIO)
+        current_version = istio_version.current_version
+
         pods = [
-            create_mock_pod_with_sidecar(
-                "pod1", "default", f"istio/proxyv2:{sample_cluster_config.current_istio_version}"
-            ),
+            create_mock_pod_with_sidecar("pod1", "default", f"istio/proxyv2:{current_version}"),
             create_mock_pod_without_sidecar("pod2", "default"),
-            create_mock_pod_with_sidecar(
-                "pod3", "default", f"istio/proxyv2:{sample_cluster_config.current_istio_version}"
-            ),
+            create_mock_pod_with_sidecar("pod3", "default", f"istio/proxyv2:{current_version}"),
         ]
 
         mock_kubernetes_provider.get_pods = AsyncMock(side_effect=[pods, []])
@@ -431,10 +451,12 @@ class TestSidecarVersionCheckWithInvalidVersions:
             sample_check_context: CheckContext with mocked dependencies
             mock_kubernetes_provider: Mock KubernetesProvider
         """
+        # Get current Istio version from service versions
+        istio_version = sample_cluster_config.get_service_version(ServiceType.ISTIO)
+        current_version = istio_version.current_version
+
         pods = [
-            create_mock_pod_with_sidecar(
-                "pod1", "default", f"istio/proxyv2:{sample_cluster_config.current_istio_version}"
-            ),
+            create_mock_pod_with_sidecar("pod1", "default", f"istio/proxyv2:{current_version}"),
             create_mock_pod_with_sidecar("pod2", "default", "istio/proxyv2:latest"),
             create_mock_pod_with_sidecar("pod3", "default", "istio/proxyv2:dev-build"),
         ]
@@ -594,7 +616,9 @@ class TestSidecarVersionCheckLogging:
             call_args = mock_logger.warning.call_args
             assert call_args[0][0] == "sidecar_version_mismatch"
             assert "default/pod1" in call_args[1]["pod"]
-            assert call_args[1]["expected"] == sample_cluster_config.current_istio_version
+            # Get current Istio version from service versions
+            istio_version = sample_cluster_config.get_service_version(ServiceType.ISTIO)
+            assert call_args[1]["expected"] == istio_version.current_version
             assert call_args[1]["actual"] == "1.18.0"
 
     @pytest.mark.asyncio
@@ -698,22 +722,20 @@ class TestSidecarVersionCheckEdgeCases:
             sample_check_context: CheckContext with mocked dependencies
             mock_kubernetes_provider: Mock KubernetesProvider
         """
+        # Get current Istio version from service versions
+        istio_version = sample_cluster_config.get_service_version(ServiceType.ISTIO)
+        current_version = istio_version.current_version
+
         mock_kubernetes_provider.get_namespaces = AsyncMock(return_value=["ns1", "ns2", "ns3"])
 
         pods_ns1 = [
-            create_mock_pod_with_sidecar(
-                "pod1", "ns1", f"istio/proxyv2:{sample_cluster_config.current_istio_version}"
-            ),
+            create_mock_pod_with_sidecar("pod1", "ns1", f"istio/proxyv2:{current_version}"),
         ]
         pods_ns2 = [
-            create_mock_pod_with_sidecar(
-                "pod2", "ns2", f"istio/proxyv2:{sample_cluster_config.current_istio_version}"
-            ),
+            create_mock_pod_with_sidecar("pod2", "ns2", f"istio/proxyv2:{current_version}"),
         ]
         pods_ns3 = [
-            create_mock_pod_with_sidecar(
-                "pod3", "ns3", f"istio/proxyv2:{sample_cluster_config.current_istio_version}"
-            ),
+            create_mock_pod_with_sidecar("pod3", "ns3", f"istio/proxyv2:{current_version}"),
         ]
 
         mock_kubernetes_provider.get_pods = AsyncMock(side_effect=[pods_ns1, pods_ns2, pods_ns3])

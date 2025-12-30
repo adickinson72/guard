@@ -59,7 +59,7 @@ class TestGitLabAdapterCreateBranch:
         adapter = GitLabAdapter(url="https://gitlab.com", token="test-token")
 
         result = await adapter.create_branch(
-            project_id="infra/k8s-clusters", branch_name="feature/istio-1.20.0-test", ref="main"
+            repository="infra/k8s-clusters", branch_name="feature/istio-1.20.0-test", ref="main"
         )
 
         mock_client.create_branch.assert_called_once_with(
@@ -80,7 +80,7 @@ class TestGitLabAdapterCreateBranch:
         adapter = GitLabAdapter(url="https://gitlab.com", token="test-token")
 
         result = await adapter.create_branch(
-            project_id="123", branch_name="hotfix/urgent-fix", ref="v1.19.0"
+            repository="123", branch_name="hotfix/urgent-fix", ref="v1.19.0"
         )
 
         mock_client.create_branch.assert_called_once_with("123", "hotfix/urgent-fix", "v1.19.0")
@@ -97,7 +97,7 @@ class TestGitLabAdapterCreateBranch:
         adapter = GitLabAdapter(url="https://gitlab.com", token="test-token")
 
         with pytest.raises(GitOpsProviderError) as exc_info:
-            await adapter.create_branch(project_id="123", branch_name="existing-branch", ref="main")
+            await adapter.create_branch(repository="123", branch_name="existing-branch", ref="main")
 
         assert "Failed to create branch" in str(exc_info.value)
 
@@ -220,7 +220,7 @@ class TestGitLabAdapterCreateMergeRequest:
             title="Istio upgrade to v1.20.0",
             description="Automated upgrade",
             draft=True,
-            assignee_ids=[100],
+            assignees=["100"],
         )
 
         mock_client.create_merge_request.assert_called_once_with(

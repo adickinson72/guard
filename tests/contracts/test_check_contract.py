@@ -7,6 +7,7 @@ import pytest
 
 from guard.core.models import CheckResult, ClusterConfig
 from guard.interfaces.check import Check, CheckContext
+from tests.conftest import create_cluster_config
 
 
 class CheckContract:
@@ -20,18 +21,15 @@ class CheckContract:
     @pytest.fixture
     def sample_cluster(self) -> ClusterConfig:
         """Sample cluster configuration for testing."""
-        from guard.core.models import DatadogTags
-
-        return ClusterConfig(
+        return create_cluster_config(
             cluster_id="test-cluster-1",
             batch_id="test",
             environment="test",
             region="us-east-1",
             gitlab_repo="test/repo",
-            flux_config_path="test/path.yaml",
+            istio_flux_path="test/path.yaml",
             aws_role_arn="arn:aws:iam::123:role/test",
-            current_istio_version="1.19.0",
-            datadog_tags=DatadogTags(cluster="test-cluster-1", env="test"),
+            istio_version="1.19.0",
             owner_team="test-team",
             owner_handle="test-user",
         )

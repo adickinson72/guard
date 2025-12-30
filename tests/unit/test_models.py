@@ -72,8 +72,8 @@ class TestClusterConfig:
         """Test that Datadog tags are properly structured."""
         tags = sample_cluster_config.datadog_tags
         assert tags.cluster == "eks-test-us-east-1"
-        assert tags.service == "istio-system"
         assert tags.env == "test"
+        # Note: service field was removed from DatadogTags - it's now per-service in ServiceVersion
 
     def test_cluster_config_update_status(self, sample_cluster_config: ClusterConfig) -> None:
         """Test updating cluster status."""

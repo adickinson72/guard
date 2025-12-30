@@ -6,7 +6,8 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 
-from guard.core.models import ClusterConfig
+from guard.core.exceptions import GitOpsError
+from guard.core.models import ClusterConfig, ServiceType
 from guard.interfaces.config_updater import ConfigUpdater
 from guard.interfaces.exceptions import PartialFailureError
 from guard.interfaces.gitops_provider import GitOpsProvider, MergeRequestInfo
@@ -29,38 +30,52 @@ class GitOpsOrchestrator:
         self,
         git_provider: GitOpsProvider,
         config_updater: ConfigUpdater,
+        service_type: ServiceType = ServiceType.ISTIO,
     ):
         """Initialize GitOps orchestrator.
 
         Args:
             git_provider: GitOps provider (GitLab, GitHub, etc.)
             config_updater: Config updater for specific format
+            service_type: Type of service being upgraded (default: ISTIO for backwards compat)
         """
         self.git = git_provider
         self.updater = config_updater
-        logger.debug("gitops_orchestrator_initialized")
+        self.service_type = service_type
+        logger.debug("gitops_orchestrator_initialized", service_type=service_type.value)
 
     @staticmethod
     def group_clusters_by_repo_path(
         clusters: list[ClusterConfig],
+        service_type: ServiceType,
     ) -> dict[tuple[str, str], list[ClusterConfig]]:
-        """Group clusters by GitLab repo and flux path.
+        """Group clusters by GitLab repo and flux path for a specific service.
 
         Args:
             clusters: List of cluster configurations
+            service_type: Type of service to get flux paths for
 
         Returns:
             Dictionary mapping (gitlab_repo, flux_config_path) to list of clusters
         """
         grouped: dict[tuple[str, str], list[ClusterConfig]] = defaultdict(list)
         for cluster in clusters:
-            key = (cluster.gitlab_repo, cluster.flux_config_path)
-            grouped[key].append(cluster)
+            flux_path = cluster.get_flux_config_path(service_type)
+            if flux_path:
+                key = (cluster.gitlab_repo, flux_path)
+                grouped[key].append(cluster)
+            else:
+                logger.warning(
+                    "cluster_missing_flux_path",
+                    cluster_id=cluster.cluster_id,
+                    service_type=service_type.value,
+                )
 
         logger.info(
             "clusters_grouped_by_repo_path",
             total_clusters=len(clusters),
             unique_repo_paths=len(grouped),
+            service_type=service_type.value,
         )
         return dict(grouped)
 
@@ -91,6 +106,14 @@ class GitOpsOrchestrator:
             target_version=target_version,
             dry_run=dry_run,
         )
+
+        # Validate flux config path exists for this service type
+        flux_config_path = cluster.get_flux_config_path(self.service_type)
+        if not flux_config_path:
+            raise GitOpsError(
+                f"No flux config path configured for service {self.service_type.value} "
+                f"on cluster {cluster.cluster_id}"
+            )
 
         # Generate MR title for deduplication check
         mr_title = self._generate_mr_title(cluster, target_version)
@@ -142,7 +165,7 @@ class GitOpsOrchestrator:
         # Get current config file
         current_content = await self.git.get_file_content(
             project_id=cluster.gitlab_repo,
-            file_path=cluster.flux_config_path,
+            file_path=flux_config_path,
             ref="main",
         )
 
@@ -169,7 +192,7 @@ class GitOpsOrchestrator:
         commit_message = f"Upgrade to {target_version} for {cluster.cluster_id}"
         await self.git.update_file(
             project_id=cluster.gitlab_repo,
-            file_path=cluster.flux_config_path,
+            file_path=flux_config_path,
             content=updated_content,
             commit_message=commit_message,
             branch=branch_name,
@@ -233,8 +256,8 @@ class GitOpsOrchestrator:
             dry_run=dry_run,
         )
 
-        # Group clusters by repo+path
-        grouped = self.group_clusters_by_repo_path(clusters)
+        # Group clusters by repo+path for this service
+        grouped = self.group_clusters_by_repo_path(clusters, self.service_type)
 
         mr_infos: dict[tuple[str, str], MergeRequestInfo] = {}
         errors: list[str] = []
@@ -429,6 +452,14 @@ class GitOpsOrchestrator:
             rollback_version=rollback_version,
         )
 
+        # Validate flux config path exists for this service type
+        flux_config_path = cluster.get_flux_config_path(self.service_type)
+        if not flux_config_path:
+            raise GitOpsError(
+                f"No flux config path configured for service {self.service_type.value} "
+                f"on cluster {cluster.cluster_id}"
+            )
+
         # Generate branch name
         branch_name = f"rollback/{cluster.cluster_id}/{rollback_version}"
 
@@ -442,7 +473,7 @@ class GitOpsOrchestrator:
         # Get and update config
         current_content = await self.git.get_file_content(
             project_id=cluster.gitlab_repo,
-            file_path=cluster.flux_config_path,
+            file_path=flux_config_path,
             ref="main",
         )
 
@@ -467,7 +498,7 @@ class GitOpsOrchestrator:
         )
         await self.git.update_file(
             project_id=cluster.gitlab_repo,
-            file_path=cluster.flux_config_path,
+            file_path=flux_config_path,
             content=updated_content,
             commit_message=commit_message,
             branch=branch_name,
@@ -535,11 +566,17 @@ class GitOpsOrchestrator:
         Returns:
             MR description
         """
-        return f"""# Upgrade
+        # Get current version from service versions
+        service_version = cluster.get_service_version(self.service_type)
+        current_version = service_version.current_version if service_version else "unknown"
+        service_name = self.service_type.value.capitalize()
+
+        return f"""# {service_name} Upgrade
 
 **Cluster**: {cluster.cluster_id}
 **Environment**: {cluster.environment}
-**Current Version**: {cluster.current_istio_version}
+**Service**: {service_name}
+**Current Version**: {current_version}
 **Target Version**: {version}
 **Batch**: {cluster.batch_id}
 **Owner**: @{cluster.owner_handle}

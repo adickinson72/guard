@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 from guard.core.models import ClusterStatus
 from guard.registry.cluster_registry import ClusterRegistry
+from tests.conftest import create_cluster_config
 
 
 class TestClusterRegistryAtomicOperations:
@@ -195,23 +196,19 @@ class TestClusterRegistryBatchPrerequisites:
         registry = ClusterRegistry("test-table", region="us-east-1")
 
         # Mock prerequisite batch with healthy clusters
-        from guard.core.models import ClusterConfig, DatadogTags
-
-        healthy_cluster = ClusterConfig(
+        healthy_cluster = create_cluster_config(
             cluster_id="cluster-1",
-            cluster_name="test-cluster",
-            region="us-east-1",
-            environment="test",
             batch_id="batch-0",
-            status=ClusterStatus.HEALTHY,
+            environment="test",
+            region="us-east-1",
             gitlab_repo="test/repo",
-            flux_config_path="/configs/test",
+            istio_flux_path="/configs/test",
             aws_role_arn="arn:aws:iam::123456789012:role/test",
-            current_istio_version="1.19.0",
-            datadog_tags=DatadogTags(cluster="test-cluster", env="test"),
+            istio_version="1.19.0",
             owner_team="test-team",
             owner_handle="test@example.com",
         )
+        healthy_cluster.status = ClusterStatus.HEALTHY
 
         registry.get_clusters_by_batch = MagicMock(return_value=[healthy_cluster])
 
@@ -231,24 +228,20 @@ class TestClusterRegistryBatchPrerequisites:
 
         registry = ClusterRegistry("test-table", region="us-east-1")
 
-        from guard.core.models import ClusterConfig, DatadogTags
-
         # Mock prerequisite batch with failed cluster
-        failed_cluster = ClusterConfig(
+        failed_cluster = create_cluster_config(
             cluster_id="cluster-1",
-            cluster_name="test-cluster",
-            region="us-east-1",
-            environment="test",
             batch_id="batch-0",
-            status=ClusterStatus.FAILED_UPGRADE_ROLLED_BACK,
+            environment="test",
+            region="us-east-1",
             gitlab_repo="test/repo",
-            flux_config_path="/configs/test",
+            istio_flux_path="/configs/test",
             aws_role_arn="arn:aws:iam::123456789012:role/test",
-            current_istio_version="1.19.0",
-            datadog_tags=DatadogTags(cluster="test-cluster", env="test"),
+            istio_version="1.19.0",
             owner_team="test-team",
             owner_handle="test@example.com",
         )
+        failed_cluster.status = ClusterStatus.FAILED_UPGRADE_ROLLED_BACK
 
         registry.get_clusters_by_batch = MagicMock(return_value=[failed_cluster])
 

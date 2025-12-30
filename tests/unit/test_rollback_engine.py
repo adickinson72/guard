@@ -7,26 +7,25 @@ from unittest.mock import AsyncMock, MagicMock, mock_open, patch
 
 import pytest
 
-from guard.core.models import ClusterConfig, ClusterMetadata, DatadogTags
 from guard.rollback.engine import RollbackEngine
+from tests.conftest import create_cluster_config
 
 
 @pytest.fixture
 def sample_cluster():
     """Create a sample cluster configuration."""
-    return ClusterConfig(
+    return create_cluster_config(
         cluster_id="eks-prod-us-east-1",
         batch_id="prod-wave-1",
         environment="production",
         region="us-east-1",
         gitlab_repo="devops/k8s-prod",
-        flux_config_path="clusters/prod/istio/helmrelease.yaml",
+        istio_flux_path="clusters/prod/istio/helmrelease.yaml",
         aws_role_arn="arn:aws:iam::123456789:role/eks-prod",
-        current_istio_version="1.20.0",
-        datadog_tags=DatadogTags(cluster="eks-prod-us-east-1", env="prod"),
+        istio_version="1.20.0",
+        istio_target_version=None,
         owner_team="platform",
         owner_handle="platform-team",
-        metadata=ClusterMetadata(),
     )
 
 

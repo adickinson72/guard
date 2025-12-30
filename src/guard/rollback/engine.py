@@ -4,7 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from guard.clients.gitlab_client import GitLabClient
-from guard.core.models import ClusterConfig
+from guard.core.models import ClusterConfig, ServiceType
 from guard.interfaces.config_updater import ConfigUpdater
 from guard.utils.logging import get_logger
 
@@ -14,16 +14,23 @@ logger = get_logger(__name__)
 class RollbackEngine:
     """Engine for automated rollback operations."""
 
-    def __init__(self, gitlab_client: GitLabClient, config_updater: ConfigUpdater):
+    def __init__(
+        self,
+        gitlab_client: GitLabClient,
+        config_updater: ConfigUpdater,
+        service_type: ServiceType = ServiceType.ISTIO,
+    ):
         """Initialize rollback engine.
 
         Args:
             gitlab_client: GitLab client instance
             config_updater: Config updater for updating GitOps files
+            service_type: Type of service being rolled back (default: ISTIO)
         """
         self.gitlab = gitlab_client
         self.updater = config_updater
-        logger.debug("rollback_engine_initialized")
+        self.service_type = service_type
+        logger.debug("rollback_engine_initialized", service_type=service_type.value)
 
     async def create_rollback_mr(
         self,
@@ -53,13 +60,20 @@ class RollbackEngine:
             reason=failure_reason,
         )
 
+        # Get service name for display
+        service_name = self.service_type.value
+
         # Generate rollback branch name with timestamp
         timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-        branch_name = f"rollback/istio-{cluster.batch_id}-{previous_version}-{timestamp}"
+        branch_name = f"rollback/{service_name}-{cluster.batch_id}-{previous_version}-{timestamp}"
 
         # Get project and config file path from cluster config
         project_id = cluster.gitlab_repo
-        config_path = cluster.flux_config_path
+        config_path = cluster.get_flux_config_path(self.service_type)
+        if not config_path:
+            raise ValueError(
+                f"No flux config path configured for service {service_name} on cluster {cluster.cluster_id}"
+            )
 
         try:
             # Create rollback branch from main
@@ -100,7 +114,7 @@ class RollbackEngine:
             config_file.unlink()
 
             # Commit changes
-            commit_message = f"""Rollback Istio from {current_version} to {previous_version} for {cluster.batch_id}
+            commit_message = f"""Rollback {service_name.capitalize()} from {current_version} to {previous_version} for {cluster.batch_id}
 
 Reason: {failure_reason}
 
@@ -121,11 +135,10 @@ This is an automated rollback created by GUARD.
             )
 
             # Create MR
-            mr_title = (
-                f"[ROLLBACK] Istio {current_version} → {previous_version} ({cluster.batch_id})"
-            )
+            mr_title = f"[ROLLBACK] {service_name.capitalize()} {current_version} → {previous_version} ({cluster.batch_id})"
             mr_description = f"""## Automated Rollback
 
+**Service**: {service_name.capitalize()}
 **Cluster Batch**: {cluster.batch_id}
 **Cluster ID**: {cluster.cluster_id}
 **Rollback**: {current_version} → {previous_version}

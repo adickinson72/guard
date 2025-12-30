@@ -146,8 +146,15 @@ class TestValidationOrchestratorCaptureBaseline:
         """Test successful baseline metric capture."""
         registry.register(mock_validator)
 
-        # Mock metric query responses
-        mock_metrics_provider.query_scalar.side_effect = [100.0, 0.001]
+        # Mock metric query responses using a function to handle any call order
+        def query_side_effect(metric_name: str, *args, **kwargs) -> float:
+            metric_values = {
+                "istio.request.latency.p95": 100.0,
+                "istio.request.error.5xx.rate": 0.001,
+            }
+            return metric_values.get(metric_name, 0.0)
+
+        mock_metrics_provider.query_scalar.side_effect = query_side_effect
 
         snapshot = await orchestrator.capture_baseline(
             cluster=sample_cluster_config, duration_minutes=10
@@ -171,8 +178,13 @@ class TestValidationOrchestratorCaptureBaseline:
         """Test baseline capture handles failed metric queries gracefully."""
         registry.register(mock_validator)
 
-        # First metric succeeds, second fails
-        mock_metrics_provider.query_scalar.side_effect = [100.0, Exception("Query failed")]
+        # Use a function to return value or raise exception based on metric name
+        def query_side_effect(metric_name: str, *args, **kwargs) -> float:
+            if metric_name == "istio.request.latency.p95":
+                return 100.0
+            raise Exception("Query failed")
+
+        mock_metrics_provider.query_scalar.side_effect = query_side_effect
 
         snapshot = await orchestrator.capture_baseline(
             cluster=sample_cluster_config, duration_minutes=10

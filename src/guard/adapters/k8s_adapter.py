@@ -4,10 +4,12 @@
 from guard.clients.kubernetes_client import KubernetesClient
 from guard.interfaces.exceptions import KubernetesProviderError
 from guard.interfaces.kubernetes_provider import (
+    DaemonSetInfo,
     DeploymentInfo,
     KubernetesProvider,
     NodeInfo,
     PodInfo,
+    StatefulSetInfo,
 )
 from guard.utils.logging import get_logger
 
@@ -348,3 +350,191 @@ class KubernetesAdapter(KubernetesProvider):
                 error=str(e),
             )
             raise KubernetesProviderError(f"Failed to exec in pod {pod_name}: {e}") from e
+
+    async def get_deployments(self, namespace: str) -> list[DeploymentInfo]:
+        """Get all deployments in a namespace.
+
+        Args:
+            namespace: Namespace to query
+
+        Returns:
+            List of normalized deployment information
+
+        Raises:
+            KubernetesProviderError: If deployments cannot be retrieved
+        """
+        try:
+            deployments = self.client.get_deployments(namespace=namespace)
+
+            # Normalize to DeploymentInfo dataclass
+            deployment_infos = []
+            for deploy in deployments:
+                # Extract container names from pod template spec
+                containers = []
+                annotations = {}
+                if deploy.spec.template and deploy.spec.template.spec:
+                    if deploy.spec.template.spec.containers:
+                        containers = [c.name for c in deploy.spec.template.spec.containers]
+                    if deploy.spec.template.metadata and deploy.spec.template.metadata.annotations:
+                        annotations = dict(deploy.spec.template.metadata.annotations)
+
+                deployment_info = DeploymentInfo(
+                    name=deploy.metadata.name,
+                    namespace=deploy.metadata.namespace,
+                    ready=self.client.check_deployment_ready(
+                        name=deploy.metadata.name, namespace=namespace
+                    ),
+                    replicas_desired=deploy.spec.replicas or 0,
+                    replicas_ready=deploy.status.ready_replicas or 0,
+                    replicas_available=deploy.status.available_replicas or 0,
+                    replicas_updated=deploy.status.updated_replicas or 0,
+                    containers=containers,
+                    annotations=annotations,
+                )
+                deployment_infos.append(deployment_info)
+
+            return deployment_infos
+
+        except Exception as e:
+            logger.error("get_deployments_failed", namespace=namespace, error=str(e))
+            raise KubernetesProviderError(f"Failed to get deployments in {namespace}: {e}") from e
+
+    async def get_statefulsets(self, namespace: str) -> list[StatefulSetInfo]:
+        """Get all statefulsets in a namespace.
+
+        Args:
+            namespace: Namespace to query
+
+        Returns:
+            List of normalized statefulset information
+
+        Raises:
+            KubernetesProviderError: If statefulsets cannot be retrieved
+        """
+        try:
+            statefulsets = self.client.get_statefulsets(namespace=namespace)
+
+            # Normalize to StatefulSetInfo dataclass
+            statefulset_infos = []
+            for sts in statefulsets:
+                # Extract container names from pod template spec
+                containers = []
+                annotations = {}
+                if sts.spec.template and sts.spec.template.spec:
+                    if sts.spec.template.spec.containers:
+                        containers = [c.name for c in sts.spec.template.spec.containers]
+                    if sts.spec.template.metadata and sts.spec.template.metadata.annotations:
+                        annotations = dict(sts.spec.template.metadata.annotations)
+
+                statefulset_info = StatefulSetInfo(
+                    name=sts.metadata.name,
+                    namespace=sts.metadata.namespace,
+                    ready=self.client.check_statefulset_ready(
+                        name=sts.metadata.name, namespace=namespace
+                    ),
+                    replicas_desired=sts.spec.replicas or 0,
+                    replicas_ready=sts.status.ready_replicas or 0,
+                    containers=containers,
+                    annotations=annotations,
+                )
+                statefulset_infos.append(statefulset_info)
+
+            return statefulset_infos
+
+        except Exception as e:
+            logger.error("get_statefulsets_failed", namespace=namespace, error=str(e))
+            raise KubernetesProviderError(f"Failed to get statefulsets in {namespace}: {e}") from e
+
+    async def get_daemonsets(self, namespace: str) -> list[DaemonSetInfo]:
+        """Get all daemonsets in a namespace.
+
+        Args:
+            namespace: Namespace to query
+
+        Returns:
+            List of normalized daemonset information
+
+        Raises:
+            KubernetesProviderError: If daemonsets cannot be retrieved
+        """
+        try:
+            daemonsets = self.client.get_daemonsets(namespace=namespace)
+
+            # Normalize to DaemonSetInfo dataclass
+            daemonset_infos = []
+            for ds in daemonsets:
+                # Extract container names from pod template spec
+                containers = []
+                annotations = {}
+                if ds.spec.template and ds.spec.template.spec:
+                    if ds.spec.template.spec.containers:
+                        containers = [c.name for c in ds.spec.template.spec.containers]
+                    if ds.spec.template.metadata and ds.spec.template.metadata.annotations:
+                        annotations = dict(ds.spec.template.metadata.annotations)
+
+                daemonset_info = DaemonSetInfo(
+                    name=ds.metadata.name,
+                    namespace=ds.metadata.namespace,
+                    ready=self.client.check_daemonset_ready(
+                        name=ds.metadata.name, namespace=namespace
+                    ),
+                    desired_number_scheduled=ds.status.desired_number_scheduled or 0,
+                    number_ready=ds.status.number_ready or 0,
+                    containers=containers,
+                    annotations=annotations,
+                )
+                daemonset_infos.append(daemonset_info)
+
+            return daemonset_infos
+
+        except Exception as e:
+            logger.error("get_daemonsets_failed", namespace=namespace, error=str(e))
+            raise KubernetesProviderError(f"Failed to get daemonsets in {namespace}: {e}") from e
+
+    async def check_statefulset_ready(self, name: str, namespace: str) -> bool:
+        """Check if a statefulset is ready.
+
+        Args:
+            name: StatefulSet name
+            namespace: Namespace
+
+        Returns:
+            True if statefulset is ready
+
+        Raises:
+            KubernetesProviderError: If check fails
+        """
+        try:
+            return self.client.check_statefulset_ready(name=name, namespace=namespace)
+        except Exception as e:
+            logger.error(
+                "check_statefulset_ready_failed",
+                name=name,
+                namespace=namespace,
+                error=str(e),
+            )
+            raise KubernetesProviderError(f"Failed to check statefulset ready: {e}") from e
+
+    async def check_daemonset_ready(self, name: str, namespace: str) -> bool:
+        """Check if a daemonset is ready.
+
+        Args:
+            name: DaemonSet name
+            namespace: Namespace
+
+        Returns:
+            True if daemonset is ready
+
+        Raises:
+            KubernetesProviderError: If check fails
+        """
+        try:
+            return self.client.check_daemonset_ready(name=name, namespace=namespace)
+        except Exception as e:
+            logger.error(
+                "check_daemonset_ready_failed",
+                name=name,
+                namespace=namespace,
+                error=str(e),
+            )
+            raise KubernetesProviderError(f"Failed to check daemonset ready: {e}") from e

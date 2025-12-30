@@ -22,9 +22,30 @@ class ClusterStatus(str, Enum):
     FAILED_UPGRADE_ROLLED_BACK = "failed-upgrade-rolled-back"
 
 
+class ServiceType(str, Enum):
+    """Supported service types for upgrades."""
+
+    ISTIO = "istio"
+    THANOS = "thanos"
+    PROMETHEUS = "prometheus"
+
+
+class ServiceVersion(BaseModel):
+    """Version info for a specific service on a cluster."""
+
+    service_type: ServiceType = Field(..., description="Type of service")
+    current_version: str = Field(..., description="Current version running")
+    target_version: str | None = Field(None, description="Target version for upgrade")
+    flux_config_path: str = Field(..., description="Path to Flux config for this service")
+    namespace: str = Field(..., description="Kubernetes namespace for the service")
+
+
 class UpgradeHistoryEntry(BaseModel):
     """Upgrade history entry."""
 
+    service_type: ServiceType = Field(
+        default=ServiceType.ISTIO, description="Service that was upgraded"
+    )
     version: str
     date: datetime
     status: str
@@ -34,8 +55,8 @@ class DatadogTags(BaseModel):
     """Datadog tags for a cluster."""
 
     cluster: str
-    service: str = "istio-system"
     env: str
+    custom_tags: dict[str, str] = Field(default_factory=dict, description="Additional custom tags")
 
 
 class ClusterMetadata(BaseModel):
@@ -56,10 +77,7 @@ class ClusterConfig(BaseModel):
     environment: str = Field(..., description="Environment: dev, staging, production")
     region: str = Field(..., description="AWS region")
     gitlab_repo: str = Field(..., description="GitLab repository path")
-    flux_config_path: str = Field(..., description="Path to Flux config file in repo")
     aws_role_arn: str = Field(..., description="IAM role ARN for EKS access")
-    current_istio_version: str = Field(..., description="Current Istio version")
-    target_istio_version: str | None = Field(None, description="Target Istio version")
     datadog_tags: DatadogTags = Field(..., description="Datadog tags for metrics")
     owner_team: str = Field(..., description="Owner team name")
     owner_handle: str = Field(..., description="GitLab handle for MR assignment")
@@ -70,10 +88,64 @@ class ClusterConfig(BaseModel):
     upgrade_history: list[UpgradeHistoryEntry] = Field(default_factory=list)
     metadata: ClusterMetadata = Field(default_factory=ClusterMetadata)
 
+    # Multi-service version tracking
+    service_versions: dict[ServiceType, ServiceVersion] = Field(
+        default_factory=dict,
+        description="Version info per service type (Istio, Thanos, Prometheus, etc.)",
+    )
+
     class Config:
         """Pydantic config."""
 
         use_enum_values = True
+
+    def get_service_version(self, service_type: ServiceType) -> ServiceVersion | None:
+        """Get version info for a specific service.
+
+        Args:
+            service_type: Type of service
+
+        Returns:
+            ServiceVersion if configured, None otherwise
+        """
+        return self.service_versions.get(service_type)
+
+    def set_service_version(
+        self,
+        service_type: ServiceType,
+        current_version: str,
+        flux_config_path: str,
+        namespace: str,
+        target_version: str | None = None,
+    ) -> None:
+        """Set version info for a specific service.
+
+        Args:
+            service_type: Type of service
+            current_version: Current version running
+            flux_config_path: Path to Flux config file
+            namespace: Kubernetes namespace
+            target_version: Optional target version for upgrade
+        """
+        self.service_versions[service_type] = ServiceVersion(
+            service_type=service_type,
+            current_version=current_version,
+            target_version=target_version,
+            flux_config_path=flux_config_path,
+            namespace=namespace,
+        )
+
+    def get_flux_config_path(self, service_type: ServiceType) -> str | None:
+        """Get Flux config path for a specific service.
+
+        Args:
+            service_type: Type of service
+
+        Returns:
+            Path to Flux config file if configured, None otherwise
+        """
+        sv = self.service_versions.get(service_type)
+        return sv.flux_config_path if sv else None
 
 
 class CheckResult(BaseModel):

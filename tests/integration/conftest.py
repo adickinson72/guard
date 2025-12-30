@@ -6,7 +6,8 @@ import boto3
 import pytest
 from botocore.exceptions import ClientError, NoCredentialsError
 
-from guard.core.models import ClusterConfig, DatadogTags
+from guard.core.models import ClusterConfig
+from tests.conftest import create_cluster_config
 
 
 @pytest.fixture
@@ -81,17 +82,16 @@ def integration_test_cluster_config() -> ClusterConfig:
     region = os.getenv("GUARD_TEST_CLUSTER_REGION", "us-east-1")
     role_arn = os.getenv("GUARD_TEST_CLUSTER_ROLE_ARN", "arn:aws:iam::123456789:role/GUARD-Test")
 
-    return ClusterConfig(
+    return create_cluster_config(
         cluster_id=cluster_id,
         batch_id="integration-test",
         environment="test",
         region=region,
         gitlab_repo="infra/k8s-test-clusters",
-        flux_config_path="clusters/test/istio-helmrelease.yaml",
+        istio_flux_path="clusters/test/istio-helmrelease.yaml",
         aws_role_arn=role_arn,
-        current_istio_version="1.19.3",
-        target_istio_version="1.20.0",
-        datadog_tags=DatadogTags(cluster=cluster_id, service="istio-system", env="test"),
+        istio_version="1.19.3",
+        istio_target_version="1.20.0",
         owner_team="platform-engineering",
         owner_handle="@platform-team",
     )

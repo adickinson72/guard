@@ -2,7 +2,7 @@
 
 import re
 
-from guard.core.models import CheckResult, ClusterConfig
+from guard.core.models import CheckResult, ClusterConfig, ServiceType
 from guard.interfaces.check import Check, CheckContext
 from guard.utils.logging import get_logger
 
@@ -70,7 +70,17 @@ class IstioSidecarVersionCheck(Check):
 
             version_mismatches = []
             total_pods_checked = 0
-            expected_version = cluster.current_istio_version
+
+            # Get Istio version from service versions
+            istio_version = cluster.get_service_version(ServiceType.ISTIO)
+            expected_version = istio_version.current_version if istio_version else None
+
+            if not expected_version:
+                return CheckResult(
+                    check_name=self.name,
+                    passed=False,
+                    message="No Istio version configured for cluster",
+                )
 
             for namespace in namespaces:
                 pods = await k8s.get_pods(namespace=namespace)

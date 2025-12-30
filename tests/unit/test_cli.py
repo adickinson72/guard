@@ -14,8 +14,9 @@ from click.testing import CliRunner
 
 from guard import __version__
 from guard.cli.main import cli
-from guard.core.models import CheckResult, ClusterConfig, DatadogTags
+from guard.core.models import CheckResult, ClusterConfig
 from guard.interfaces.validator import ValidationResult
+from tests.conftest import create_cluster_config
 
 
 @pytest.fixture
@@ -48,31 +49,29 @@ gitlab:
 def sample_clusters() -> list[ClusterConfig]:
     """Provide sample cluster configurations."""
     return [
-        ClusterConfig(
+        create_cluster_config(
             cluster_id="eks-test-us-east-1",
             batch_id="test-batch",
             environment="test",
             region="us-east-1",
             gitlab_repo="infra/k8s-clusters",
-            flux_config_path="clusters/test/istio-helmrelease.yaml",
+            istio_flux_path="clusters/test/istio-helmrelease.yaml",
             aws_role_arn="arn:aws:iam::123456789:role/test",
-            current_istio_version="1.19.3",
-            target_istio_version="1.20.0",
-            datadog_tags=DatadogTags(cluster="eks-test", service="istio", env="test"),
+            istio_version="1.19.3",
+            istio_target_version="1.20.0",
             owner_team="platform",
             owner_handle="@platform",
         ),
-        ClusterConfig(
+        create_cluster_config(
             cluster_id="eks-test-us-west-2",
             batch_id="test-batch",
             environment="test",
             region="us-west-2",
             gitlab_repo="infra/k8s-clusters",
-            flux_config_path="clusters/test-west/istio-helmrelease.yaml",
+            istio_flux_path="clusters/test-west/istio-helmrelease.yaml",
             aws_role_arn="arn:aws:iam::123456789:role/test",
-            current_istio_version="1.19.3",
-            target_istio_version="1.20.0",
-            datadog_tags=DatadogTags(cluster="eks-test-west", service="istio", env="test"),
+            istio_version="1.19.3",
+            istio_target_version="1.20.0",
             owner_team="platform",
             owner_handle="@platform",
         ),
@@ -523,33 +522,40 @@ def test_rollback_command_success(
     mock_ctx.gitlab_adapter = MagicMock()
     mock_ctx.helm_updater = MagicMock()
 
+    # Create mock service implementation
+    mock_service = MagicMock()
+    mock_service.service_name = "istio"
+    mock_service.get_config_updater.return_value = mock_ctx.helm_updater
+
     with patch("guard.cli.main.GuardContext", return_value=mock_ctx):
-        with patch("guard.rollback.engine.RollbackEngine") as mock_rollback:
-            mock_rollback_instance = MagicMock()
-            mock_rollback_instance.create_rollback_mr = AsyncMock(
-                return_value="https://gitlab.com/mr/789"
-            )
-            mock_rollback.return_value = mock_rollback_instance
+        with patch("guard.services.register_all_services"):
+            with patch("guard.services.ServiceRegistry.get", return_value=mock_service):
+                with patch("guard.rollback.engine.RollbackEngine") as mock_rollback:
+                    mock_rollback_instance = MagicMock()
+                    mock_rollback_instance.create_rollback_mr = AsyncMock(
+                        return_value="https://gitlab.com/mr/789"
+                    )
+                    mock_rollback.return_value = mock_rollback_instance
 
-            with patch("guard.clients.gitlab_client.GitLabClient"):
-                result = cli_runner.invoke(
-                    cli,
-                    [
-                        "--config",
-                        str(mock_config_file),
-                        "rollback",
-                        "--batch",
-                        "test-batch",
-                        "--reason",
-                        "Critical bug detected",
-                    ],
-                )
+                    with patch("guard.clients.gitlab_client.GitLabClient"):
+                        result = cli_runner.invoke(
+                            cli,
+                            [
+                                "--config",
+                                str(mock_config_file),
+                                "rollback",
+                                "--batch",
+                                "test-batch",
+                                "--reason",
+                                "Critical bug detected",
+                            ],
+                        )
 
-                assert result.exit_code == 0
-                assert "GUARD Rollback Command" in result.output
-                assert "test-batch" in result.output
-                assert "Critical bug detected" in result.output
-                assert "Rollback MR created" in result.output
+                        assert result.exit_code == 0
+                        assert "GUARD Rollback Command" in result.output
+                        assert "test-batch" in result.output
+                        assert "Critical bug detected" in result.output
+                        assert "Rollback MR created" in result.output
 
 
 # ==============================================================================

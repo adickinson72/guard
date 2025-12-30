@@ -39,6 +39,34 @@ class DeploymentInfo:
     replicas_ready: int
     replicas_available: int
     replicas_updated: int
+    containers: list[str] | None = None  # Container names for sidecar detection
+    annotations: dict[str, str] | None = None  # Pod template annotations
+
+
+@dataclass
+class StatefulSetInfo:
+    """Normalized statefulset information."""
+
+    name: str
+    namespace: str
+    ready: bool
+    replicas_desired: int
+    replicas_ready: int
+    containers: list[str] | None = None  # Container names for sidecar detection
+    annotations: dict[str, str] | None = None  # Pod template annotations
+
+
+@dataclass
+class DaemonSetInfo:
+    """Normalized daemonset information."""
+
+    name: str
+    namespace: str
+    ready: bool
+    desired_number_scheduled: int
+    number_ready: int
+    containers: list[str] | None = None  # Container names for sidecar detection
+    annotations: dict[str, str] | None = None  # Pod template annotations
 
 
 class KubernetesProvider(ABC):
@@ -130,6 +158,78 @@ class KubernetesProvider(ABC):
 
         Returns:
             True if deployment is ready
+
+        Raises:
+            KubernetesProviderError: If check fails
+        """
+
+    @abstractmethod
+    async def get_deployments(self, namespace: str) -> list["DeploymentInfo"]:
+        """Get all deployments in a namespace.
+
+        Args:
+            namespace: Namespace to query
+
+        Returns:
+            List of normalized deployment information
+
+        Raises:
+            KubernetesProviderError: If deployments cannot be retrieved
+        """
+
+    @abstractmethod
+    async def get_statefulsets(self, namespace: str) -> list["StatefulSetInfo"]:
+        """Get all statefulsets in a namespace.
+
+        Args:
+            namespace: Namespace to query
+
+        Returns:
+            List of normalized statefulset information
+
+        Raises:
+            KubernetesProviderError: If statefulsets cannot be retrieved
+        """
+
+    @abstractmethod
+    async def get_daemonsets(self, namespace: str) -> list["DaemonSetInfo"]:
+        """Get all daemonsets in a namespace.
+
+        Args:
+            namespace: Namespace to query
+
+        Returns:
+            List of normalized daemonset information
+
+        Raises:
+            KubernetesProviderError: If daemonsets cannot be retrieved
+        """
+
+    @abstractmethod
+    async def check_statefulset_ready(self, name: str, namespace: str) -> bool:
+        """Check if a statefulset is ready.
+
+        Args:
+            name: StatefulSet name
+            namespace: Namespace
+
+        Returns:
+            True if statefulset is ready
+
+        Raises:
+            KubernetesProviderError: If check fails
+        """
+
+    @abstractmethod
+    async def check_daemonset_ready(self, name: str, namespace: str) -> bool:
+        """Check if a daemonset is ready.
+
+        Args:
+            name: DaemonSet name
+            namespace: Namespace
+
+        Returns:
+            True if daemonset is ready
 
         Raises:
             KubernetesProviderError: If check fails
