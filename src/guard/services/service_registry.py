@@ -134,14 +134,12 @@ def register_all_services() -> None:
     """
     # Import services here to avoid circular imports
     from guard.services.istio.istio_service import IstioService
+    from guard.services.prometheus.prometheus_service import PrometheusService
+    from guard.services.thanos.thanos_service import ThanosService
 
     ServiceRegistry.register(ServiceType.ISTIO, IstioService)
-
-    # Thanos and Prometheus will be registered when implemented
-    # from guard.services.thanos.thanos_service import ThanosService
-    # from guard.services.prometheus.prometheus_service import PrometheusService
-    # ServiceRegistry.register(ServiceType.THANOS, ThanosService)
-    # ServiceRegistry.register(ServiceType.PROMETHEUS, PrometheusService)
+    ServiceRegistry.register(ServiceType.THANOS, ThanosService)
+    ServiceRegistry.register(ServiceType.PROMETHEUS, PrometheusService)
 
     logger.info(
         "services_registered",
