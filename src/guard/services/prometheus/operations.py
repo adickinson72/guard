@@ -1,11 +1,21 @@
 """Prometheus-specific operations extracted for post-upgrade validation."""
 
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from guard.core.models import CheckResult
-from guard.services.prometheus.config import DEFAULT_PROMETHEUS_NAMESPACE, PROMETHEUS_COMPONENTS
+from guard.core.models import CheckResult, ServiceType
+from guard.services.prometheus.config import (
+    DEFAULT_PROMETHEUS_CONFIG,
+    PrometheusServiceConfig,
+)
+from guard.services.utils.pod_utils import (
+    PodRetrievalConfig,
+    ServiceHealthConfig,
+    check_pods_ready,
+    check_service_http_health,
+    query_prometheus_targets,
+)
 from guard.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -13,6 +23,22 @@ if TYPE_CHECKING:
     from guard.interfaces.kubernetes_provider import KubernetesProvider
 
 logger = get_logger(__name__)
+
+
+def _get_namespace(cluster: "ClusterConfig", config: PrometheusServiceConfig) -> str:
+    """Get namespace from cluster config or fall back to default.
+
+    Args:
+        cluster: Cluster configuration
+        config: Prometheus service configuration
+
+    Returns:
+        Namespace to use for Prometheus operations
+    """
+    service_version = cluster.get_service_version(ServiceType.PROMETHEUS)
+    if service_version and service_version.namespace:
+        return service_version.namespace
+    return config.namespace
 
 
 class PrometheusOperations:
@@ -27,70 +53,103 @@ class PrometheusOperations:
     async def validate_deployment(
         cluster: "ClusterConfig",
         k8s_provider: "KubernetesProvider",
+        config: PrometheusServiceConfig | None = None,
     ) -> CheckResult:
         """Validate Prometheus deployment after upgrade.
 
         Performs comprehensive Prometheus health checks including:
         - Server pods ready and running
+        - HTTP readiness endpoint responding
         - Alertmanager pods ready (if deployed)
         - Pushgateway pods ready (if deployed)
 
         Args:
             cluster: Cluster configuration
             k8s_provider: Kubernetes provider for API access
+            config: Optional service configuration (uses default if not provided)
 
         Returns:
             CheckResult indicating pass/fail with detailed messages
         """
-        logger.info("validating_prometheus_deployment", cluster_id=cluster.cluster_id)
+        config = config or DEFAULT_PROMETHEUS_CONFIG
+        namespace = _get_namespace(cluster, config)
+
+        logger.info(
+            "validating_prometheus_deployment",
+            cluster_id=cluster.cluster_id,
+            namespace=namespace,
+        )
         issues: list[str] = []
         healthy_components: list[str] = []
 
-        namespace = DEFAULT_PROMETHEUS_NAMESPACE
-
-        # Check each Prometheus component
-        for component in PROMETHEUS_COMPONENTS:
+        # Check each Prometheus component using configurable selectors
+        for component_name, component_config in config.components.items():
             try:
-                pods = await k8s_provider.get_pods(
-                    namespace=namespace, label_selector=f"app.kubernetes.io/name={component}"
+                pod_config = PodRetrievalConfig(
+                    component_name=component_name,
+                    label_selectors=component_config.label_selectors,
+                    namespace=namespace,
+                    is_required=component_config.is_required,
                 )
 
-                # Also try alternative label selector
-                if not pods:
-                    pods = await k8s_provider.get_pods(
-                        namespace=namespace, label_selector=f"app={component}"
-                    )
+                all_ready, ready_pods, not_ready_pods = await check_pods_ready(
+                    k8s_provider, pod_config
+                )
 
-                if pods:
-                    not_ready = [pod.name for pod in pods if not pod.ready]
-                    if not_ready:
-                        issues.append(f"{component} pods not ready: {', '.join(not_ready)}")
+                if ready_pods:
+                    if not_ready_pods:
+                        issues.append(
+                            f"{component_name} pods not ready: {', '.join(not_ready_pods)}"
+                        )
                     else:
-                        healthy_components.append(component)
+                        healthy_components.append(component_name)
                         logger.info(
                             "prometheus_component_healthy",
-                            component=component,
-                            pod_count=len(pods),
+                            component=component_name,
+                            pod_count=len(ready_pods),
                         )
+
+                        # Service-level HTTP health check for server
+                        if component_name == "prometheus-server":
+                            health_config = ServiceHealthConfig(
+                                service_name=component_name,
+                                namespace=namespace,
+                                port=component_config.http_port,
+                                ready_endpoint=component_config.ready_endpoint,
+                            )
+                            is_healthy, health_msg = await check_service_http_health(
+                                k8s_provider, health_config, check_ready=True
+                            )
+                            if not is_healthy:
+                                issues.append(f"Server HTTP health check failed: {health_msg}")
+                                logger.warning(
+                                    "prometheus_server_http_unhealthy",
+                                    message=health_msg,
+                                )
+                            else:
+                                logger.info("prometheus_server_http_healthy")
                 else:
-                    # Component not deployed - may be optional
-                    logger.debug(
-                        "prometheus_component_not_found",
-                        component=component,
-                        message="Component may not be deployed",
-                    )
+                    if component_config.is_required:
+                        issues.append(f"Required component {component_name} not found")
+                    else:
+                        logger.debug(
+                            "prometheus_component_not_found",
+                            component=component_name,
+                            message="Optional component may not be deployed",
+                        )
 
             except Exception as e:
                 logger.warning(
                     "prometheus_component_check_failed",
-                    component=component,
+                    component=component_name,
                     error=str(e),
                 )
-                issues.append(f"Failed to check {component}: {e!s}")
+                if component_config.is_required:
+                    issues.append(f"Failed to check {component_name}: {e!s}")
 
-        # Require at least prometheus-server to be healthy
-        required_components = {"prometheus-server"}
-        missing_required = required_components - set(healthy_components)
+        # Verify required components are healthy
+        required = config.get_required_components()
+        missing_required = set(required) - set(healthy_components)
         if missing_required:
             issues.append(f"Required components not healthy: {', '.join(missing_required)}")
 
@@ -117,114 +176,146 @@ class PrometheusOperations:
                 "healthy_components": healthy_components,
                 "issues": issues,
             },
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
         )
 
     @staticmethod
     async def perform_post_upgrade_checks(
         cluster: "ClusterConfig",
         k8s_provider: "KubernetesProvider",
+        config: PrometheusServiceConfig | None = None,
+        wait_for_stabilization: bool = True,
+        stabilization_timeout: int = 300,
     ) -> CheckResult:
         """Perform Prometheus-specific post-upgrade checks.
 
         Validates:
-        - Server is accepting scrapes
-        - TSDB is healthy
+        - Server is accepting scrapes (via /api/v1/targets)
+        - TSDB is healthy (via /-/ready endpoint)
         - Alertmanager connectivity (if deployed)
 
         Args:
             cluster: Cluster configuration
             k8s_provider: Kubernetes provider for API access
+            config: Optional service configuration
+            wait_for_stabilization: Whether to wait for TSDB to stabilize
+            stabilization_timeout: Timeout for stabilization wait
 
         Returns:
             CheckResult indicating success/failure
         """
-        logger.info("performing_prometheus_post_upgrade_checks", cluster_id=cluster.cluster_id)
+        config = config or DEFAULT_PROMETHEUS_CONFIG
+        namespace = _get_namespace(cluster, config)
+
+        logger.info(
+            "performing_prometheus_post_upgrade_checks",
+            cluster_id=cluster.cluster_id,
+            namespace=namespace,
+        )
         issues: list[str] = []
         checks_passed: list[str] = []
 
-        namespace = DEFAULT_PROMETHEUS_NAMESPACE
-
-        # 1. Check server status
-        try:
-            server_pods = await k8s_provider.get_pods(
-                namespace=namespace, label_selector="app.kubernetes.io/name=prometheus-server"
+        # 1. Wait for TSDB stabilization if requested
+        if wait_for_stabilization:
+            logger.info(
+                "waiting_for_prometheus_stabilization",
+                timeout=stabilization_timeout,
             )
-            if not server_pods:
-                server_pods = await k8s_provider.get_pods(
-                    namespace=namespace, label_selector="app=prometheus-server"
-                )
-
-            if server_pods:
-                ready_servers = [pod for pod in server_pods if pod.ready]
-                if len(ready_servers) == len(server_pods):
-                    checks_passed.append("server_ready")
-                    logger.info("prometheus_server_ready", ready_count=len(ready_servers))
-                else:
-                    issues.append(
-                        f"Server not fully ready: {len(ready_servers)}/{len(server_pods)} ready"
-                    )
-            else:
-                issues.append("No Prometheus server pods found")
-        except Exception as e:
-            logger.warning("server_check_failed", error=str(e))
-            issues.append(f"Failed to check server: {e!s}")
-
-        # 2. Check alertmanager status (optional)
-        try:
-            am_pods = await k8s_provider.get_pods(
-                namespace=namespace, label_selector="app.kubernetes.io/name=prometheus-alertmanager"
-            )
-            if not am_pods:
-                am_pods = await k8s_provider.get_pods(
-                    namespace=namespace, label_selector="app=alertmanager"
-                )
-
-            if am_pods:
-                ready_am = [pod for pod in am_pods if pod.ready]
-                if len(ready_am) > 0:
-                    checks_passed.append("alertmanager_ready")
-                    logger.info("prometheus_alertmanager_ready", ready_count=len(ready_am))
-                else:
-                    # Alertmanager issues are warnings, not failures
-                    logger.warning(
-                        "prometheus_alertmanager_not_ready",
-                        ready=len(ready_am),
-                        total=len(am_pods),
-                    )
-            else:
-                # Alertmanager is optional
-                logger.debug("prometheus_alertmanager_not_deployed")
-                checks_passed.append("alertmanager_optional")
-        except Exception as e:
-            logger.debug("alertmanager_check_skipped", error=str(e))
-
-        # 3. Check node-exporter status (optional but common)
-        try:
-            ne_pods = await k8s_provider.get_pods(
+            stabilized = await PrometheusOperations.wait_for_tsdb_ready(
+                k8s_provider,
                 namespace=namespace,
-                label_selector="app.kubernetes.io/name=prometheus-node-exporter",
+                timeout_seconds=stabilization_timeout,
+                config=config,
             )
-            if not ne_pods:
-                ne_pods = await k8s_provider.get_pods(
-                    namespace=namespace, label_selector="app=node-exporter"
-                )
-
-            if ne_pods:
-                ready_ne = [pod for pod in ne_pods if pod.ready]
-                if len(ready_ne) == len(ne_pods):
-                    checks_passed.append("node_exporter_ready")
-                    logger.info("prometheus_node_exporter_ready", ready_count=len(ready_ne))
-                else:
-                    logger.warning(
-                        "prometheus_node_exporter_not_fully_ready",
-                        ready=len(ready_ne),
-                        total=len(ne_pods),
-                    )
+            if stabilized:
+                checks_passed.append("tsdb_stabilized")
             else:
-                logger.debug("prometheus_node_exporter_not_deployed")
+                issues.append("TSDB stabilization timed out")
+
+        # 2. Check server HTTP readiness endpoint
+        server_config = config.get_component("prometheus-server")
+        if server_config:
+            health_config = ServiceHealthConfig(
+                service_name="prometheus-server",
+                namespace=namespace,
+                port=server_config.http_port,
+                ready_endpoint=server_config.ready_endpoint,
+                health_endpoint=server_config.health_endpoint,
+            )
+            is_healthy, health_msg = await check_service_http_health(
+                k8s_provider, health_config, check_ready=True, check_healthy=True
+            )
+            if is_healthy:
+                checks_passed.append("server_http_ready")
+                logger.info("prometheus_server_http_ready")
+            else:
+                issues.append(f"Server HTTP check failed: {health_msg}")
+
+        # 3. Query targets API to verify scraping is working
+        try:
+            success, up_count, total_count = await query_prometheus_targets(
+                k8s_provider,
+                namespace=namespace,
+                service_name="prometheus-server",
+                port=server_config.http_port if server_config else 9090,
+            )
+            if success:
+                if total_count > 0:
+                    up_ratio = up_count / total_count if total_count > 0 else 0
+                    if up_ratio >= 0.9:  # At least 90% of targets should be up
+                        checks_passed.append("scrape_targets_healthy")
+                        logger.info(
+                            "prometheus_scrape_targets_healthy",
+                            up_count=up_count,
+                            total_count=total_count,
+                            up_ratio=up_ratio,
+                        )
+                    else:
+                        issues.append(
+                            f"Too many targets down: {up_count}/{total_count} up ({up_ratio:.1%})"
+                        )
+                else:
+                    logger.warning("prometheus_no_targets_found")
+                    checks_passed.append("targets_api_reachable")
+            else:
+                issues.append("Failed to query targets API")
         except Exception as e:
-            logger.debug("node_exporter_check_skipped", error=str(e))
+            logger.warning("targets_query_failed", error=str(e))
+            issues.append(f"Targets API query failed: {e!s}")
+
+        # 4. Check alertmanager status (optional)
+        am_config = config.get_component("prometheus-alertmanager")
+        if am_config:
+            try:
+                pod_config = PodRetrievalConfig(
+                    component_name="prometheus-alertmanager",
+                    label_selectors=am_config.label_selectors,
+                    namespace=namespace,
+                )
+                all_ready, ready_pods, _ = await check_pods_ready(k8s_provider, pod_config)
+
+                if ready_pods:
+                    if all_ready:
+                        # Check HTTP health
+                        health_config = ServiceHealthConfig(
+                            service_name="prometheus-alertmanager",
+                            namespace=namespace,
+                            port=am_config.http_port,
+                            ready_endpoint=am_config.ready_endpoint,
+                        )
+                        is_healthy, _ = await check_service_http_health(
+                            k8s_provider, health_config, check_ready=True
+                        )
+                        if is_healthy:
+                            checks_passed.append("alertmanager_ready")
+                            logger.info("prometheus_alertmanager_ready")
+                    else:
+                        logger.warning("prometheus_alertmanager_not_fully_ready")
+                else:
+                    logger.debug("prometheus_alertmanager_not_deployed")
+                    checks_passed.append("alertmanager_optional")
+            except Exception as e:
+                logger.debug("alertmanager_check_skipped", error=str(e))
 
         passed = len(issues) == 0
         message = (
@@ -249,27 +340,35 @@ class PrometheusOperations:
                 "checks_passed": checks_passed,
                 "issues": issues,
             },
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
         )
 
     @staticmethod
     async def wait_for_tsdb_ready(
         k8s_provider: "KubernetesProvider",
-        namespace: str = DEFAULT_PROMETHEUS_NAMESPACE,
+        namespace: str | None = None,
         timeout_seconds: int = 300,
         check_interval: int = 10,
+        config: PrometheusServiceConfig | None = None,
     ) -> bool:
         """Wait for Prometheus TSDB to be ready.
 
+        Checks both pod readiness AND HTTP /-/ready endpoint.
+
         Args:
             k8s_provider: Kubernetes provider
-            namespace: Prometheus namespace
+            namespace: Prometheus namespace (uses config default if not provided)
             timeout_seconds: Maximum wait time
             check_interval: Seconds between checks
+            config: Optional service configuration
 
         Returns:
             True if TSDB is ready, False if timed out
         """
+        config = config or DEFAULT_PROMETHEUS_CONFIG
+        namespace = namespace or config.namespace
+        server_config = config.get_component("prometheus-server")
+
         logger.info(
             "waiting_for_tsdb_ready",
             namespace=namespace,
@@ -279,21 +378,30 @@ class PrometheusOperations:
         elapsed = 0
         while elapsed < timeout_seconds:
             try:
-                server_pods = await k8s_provider.get_pods(
-                    namespace=namespace, label_selector="app.kubernetes.io/name=prometheus-server"
+                # Check pod readiness
+                pod_config = PodRetrievalConfig(
+                    component_name="prometheus-server",
+                    label_selectors=server_config.label_selectors if server_config else [],
+                    namespace=namespace,
                 )
-                if not server_pods:
-                    server_pods = await k8s_provider.get_pods(
-                        namespace=namespace, label_selector="app=prometheus-server"
+                all_ready, ready_pods, _ = await check_pods_ready(k8s_provider, pod_config)
+
+                if ready_pods and all_ready:
+                    # Verify with HTTP health check
+                    health_config = ServiceHealthConfig(
+                        service_name="prometheus-server",
+                        namespace=namespace,
+                        port=server_config.http_port if server_config else 9090,
+                    )
+                    is_healthy, _ = await check_service_http_health(
+                        k8s_provider, health_config, check_ready=True
                     )
 
-                if server_pods:
-                    all_ready = all(pod.ready for pod in server_pods)
-                    if all_ready:
+                    if is_healthy:
                         logger.info(
                             "tsdb_ready",
                             elapsed_seconds=elapsed,
-                            pod_count=len(server_pods),
+                            pod_count=len(ready_pods),
                         )
                         return True
 

@@ -1,9 +1,99 @@
 """Prometheus service configuration and constants."""
 
-# Default namespace for Prometheus
+from dataclasses import dataclass, field
+
+
+@dataclass
+class PrometheusComponentConfig:
+    """Configuration for a Prometheus component."""
+
+    name: str
+    label_selectors: list[str] = field(default_factory=list)
+    is_required: bool = False
+    http_port: int = 9090
+    ready_endpoint: str = "/-/ready"
+    health_endpoint: str = "/-/healthy"
+
+    def __post_init__(self) -> None:
+        """Generate default label selectors if none provided."""
+        if not self.label_selectors:
+            self.label_selectors = [
+                f"app.kubernetes.io/name={self.name}",
+                f"app={self.name}",
+                f"app.kubernetes.io/component={self.name.replace('prometheus-', '')}",
+            ]
+
+
+@dataclass
+class PrometheusServiceConfig:
+    """Configuration for Prometheus service operations.
+
+    This configuration allows customization of namespaces, label selectors,
+    and component settings for different Helm chart conventions.
+    """
+
+    namespace: str = "monitoring"
+    components: dict[str, PrometheusComponentConfig] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Initialize default component configurations."""
+        if not self.components:
+            self.components = {
+                "prometheus-server": PrometheusComponentConfig(
+                    name="prometheus-server",
+                    is_required=True,
+                    http_port=9090,
+                    label_selectors=[
+                        "app.kubernetes.io/name=prometheus",
+                        "app.kubernetes.io/name=prometheus-server",
+                        "app=prometheus-server",
+                        "app=prometheus",
+                    ],
+                ),
+                "prometheus-alertmanager": PrometheusComponentConfig(
+                    name="prometheus-alertmanager",
+                    is_required=False,
+                    http_port=9093,
+                    label_selectors=[
+                        "app.kubernetes.io/name=alertmanager",
+                        "app.kubernetes.io/name=prometheus-alertmanager",
+                        "app=alertmanager",
+                        "app=prometheus-alertmanager",
+                    ],
+                ),
+                "prometheus-pushgateway": PrometheusComponentConfig(
+                    name="prometheus-pushgateway",
+                    is_required=False,
+                    http_port=9091,
+                ),
+                "prometheus-node-exporter": PrometheusComponentConfig(
+                    name="prometheus-node-exporter",
+                    is_required=False,
+                    http_port=9100,
+                    label_selectors=[
+                        "app.kubernetes.io/name=prometheus-node-exporter",
+                        "app=prometheus-node-exporter",
+                        "app=node-exporter",
+                    ],
+                ),
+            }
+
+    def get_component(self, name: str) -> PrometheusComponentConfig | None:
+        """Get component configuration by name."""
+        return self.components.get(name)
+
+    def get_required_components(self) -> list[str]:
+        """Get list of required component names."""
+        return [name for name, cfg in self.components.items() if cfg.is_required]
+
+
+# Default configuration instance
+DEFAULT_PROMETHEUS_CONFIG = PrometheusServiceConfig()
+
+# Default namespace for Prometheus (for backward compatibility)
 DEFAULT_PROMETHEUS_NAMESPACE = "monitoring"
 
-# Prometheus components to monitor
+# Prometheus components to monitor (for backward compatibility)
 PROMETHEUS_COMPONENTS = [
     "prometheus-server",
     "prometheus-alertmanager",

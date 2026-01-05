@@ -1,6 +1,6 @@
 """Thanos service implementation."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from guard.checks.check_registry import CheckRegistry
 from guard.core.models import CheckResult, ServiceType, ValidationThresholds
@@ -137,7 +137,7 @@ class ThanosService(BaseService):
         logger.info("performing_thanos_post_upgrade_operations", cluster_id=cluster.cluster_id)
         return await ThanosOperations.perform_post_upgrade_checks(cluster, k8s_provider)
 
-    def get_metric_aggregations(self) -> dict:
+    def get_metric_aggregations(self) -> dict[str, Any]:
         """Get Thanos metric aggregation definitions.
 
         Returns:

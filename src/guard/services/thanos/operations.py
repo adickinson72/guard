@@ -1,11 +1,21 @@
 """Thanos-specific operations extracted for post-upgrade validation."""
 
 import asyncio
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from guard.core.models import CheckResult
-from guard.services.thanos.config import DEFAULT_THANOS_NAMESPACE, THANOS_COMPONENTS
+from guard.core.models import CheckResult, ServiceType
+from guard.services.thanos.config import (
+    DEFAULT_THANOS_CONFIG,
+    ThanosServiceConfig,
+)
+from guard.services.utils.pod_utils import (
+    PodRetrievalConfig,
+    ServiceHealthConfig,
+    check_pods_ready,
+    check_service_http_health,
+    query_thanos_stores,
+)
 from guard.utils.logging import get_logger
 
 if TYPE_CHECKING:
@@ -13,6 +23,22 @@ if TYPE_CHECKING:
     from guard.interfaces.kubernetes_provider import KubernetesProvider
 
 logger = get_logger(__name__)
+
+
+def _get_namespace(cluster: "ClusterConfig", config: ThanosServiceConfig) -> str:
+    """Get namespace from cluster config or fall back to default.
+
+    Args:
+        cluster: Cluster configuration
+        config: Thanos service configuration
+
+    Returns:
+        Namespace to use for Thanos operations
+    """
+    service_version = cluster.get_service_version(ServiceType.THANOS)
+    if service_version and service_version.namespace:
+        return service_version.namespace
+    return config.namespace
 
 
 class ThanosOperations:
@@ -27,11 +53,12 @@ class ThanosOperations:
     async def validate_deployment(
         cluster: "ClusterConfig",
         k8s_provider: "KubernetesProvider",
+        config: ThanosServiceConfig | None = None,
     ) -> CheckResult:
         """Validate Thanos deployment after upgrade.
 
         Performs comprehensive Thanos health checks including:
-        - Query pods ready and running
+        - Query pods ready and running with HTTP health check
         - Store pods ready and running
         - Compactor pods ready
         - Query frontend pods ready (if deployed)
@@ -39,59 +66,90 @@ class ThanosOperations:
         Args:
             cluster: Cluster configuration
             k8s_provider: Kubernetes provider for API access
+            config: Optional service configuration (uses default if not provided)
 
         Returns:
             CheckResult indicating pass/fail with detailed messages
         """
-        logger.info("validating_thanos_deployment", cluster_id=cluster.cluster_id)
+        config = config or DEFAULT_THANOS_CONFIG
+        namespace = _get_namespace(cluster, config)
+
+        logger.info(
+            "validating_thanos_deployment",
+            cluster_id=cluster.cluster_id,
+            namespace=namespace,
+        )
         issues: list[str] = []
         healthy_components: list[str] = []
 
-        namespace = DEFAULT_THANOS_NAMESPACE
-
-        # Check each Thanos component
-        for component in THANOS_COMPONENTS:
+        # Check each Thanos component using configurable selectors
+        for component_name, component_config in config.components.items():
             try:
-                pods = await k8s_provider.get_pods(
-                    namespace=namespace, label_selector=f"app.kubernetes.io/name={component}"
+                pod_config = PodRetrievalConfig(
+                    component_name=component_name,
+                    label_selectors=component_config.label_selectors,
+                    namespace=namespace,
+                    is_required=component_config.is_required,
                 )
 
-                # Also try alternative label selector
-                if not pods:
-                    pods = await k8s_provider.get_pods(
-                        namespace=namespace, label_selector=f"app={component}"
-                    )
+                all_ready, ready_pods, not_ready_pods = await check_pods_ready(
+                    k8s_provider, pod_config
+                )
 
-                if pods:
-                    not_ready = [pod.name for pod in pods if not pod.ready]
-                    if not_ready:
-                        issues.append(f"{component} pods not ready: {', '.join(not_ready)}")
+                if ready_pods:
+                    if not_ready_pods:
+                        issues.append(
+                            f"{component_name} pods not ready: {', '.join(not_ready_pods)}"
+                        )
                     else:
-                        healthy_components.append(component)
+                        healthy_components.append(component_name)
                         logger.info(
                             "thanos_component_healthy",
-                            component=component,
-                            pod_count=len(pods),
+                            component=component_name,
+                            pod_count=len(ready_pods),
                         )
+
+                        # Service-level HTTP health check for query component
+                        if component_name == "thanos-query":
+                            health_config = ServiceHealthConfig(
+                                service_name=component_name,
+                                namespace=namespace,
+                                port=component_config.http_port,
+                                ready_endpoint=component_config.ready_endpoint,
+                            )
+                            is_healthy, health_msg = await check_service_http_health(
+                                k8s_provider, health_config, check_ready=True
+                            )
+                            if not is_healthy:
+                                issues.append(f"Query HTTP health check failed: {health_msg}")
+                                logger.warning(
+                                    "thanos_query_http_unhealthy",
+                                    message=health_msg,
+                                )
+                            else:
+                                logger.info("thanos_query_http_healthy")
                 else:
-                    # Component not deployed - this may be optional
-                    logger.debug(
-                        "thanos_component_not_found",
-                        component=component,
-                        message="Component may not be deployed",
-                    )
+                    if component_config.is_required:
+                        issues.append(f"Required component {component_name} not found")
+                    else:
+                        logger.debug(
+                            "thanos_component_not_found",
+                            component=component_name,
+                            message="Optional component may not be deployed",
+                        )
 
             except Exception as e:
                 logger.warning(
                     "thanos_component_check_failed",
-                    component=component,
+                    component=component_name,
                     error=str(e),
                 )
-                issues.append(f"Failed to check {component}: {e!s}")
+                if component_config.is_required:
+                    issues.append(f"Failed to check {component_name}: {e!s}")
 
-        # Require at least query and store to be healthy
-        required_components = {"thanos-query", "thanos-store"}
-        missing_required = required_components - set(healthy_components)
+        # Verify required components are healthy
+        required = config.get_required_components()
+        missing_required = set(required) - set(healthy_components)
         if missing_required:
             issues.append(f"Required components not healthy: {', '.join(missing_required)}")
 
@@ -118,135 +176,170 @@ class ThanosOperations:
                 "healthy_components": healthy_components,
                 "issues": issues,
             },
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
         )
 
     @staticmethod
     async def perform_post_upgrade_checks(
         cluster: "ClusterConfig",
         k8s_provider: "KubernetesProvider",
+        config: ThanosServiceConfig | None = None,
+        wait_for_stabilization: bool = True,
+        stabilization_timeout: int = 300,
     ) -> CheckResult:
         """Perform Thanos-specific post-upgrade checks.
 
         Validates:
-        - Store gateway has synced blocks (via logs or metrics)
+        - Store gateway has synced blocks (via /api/v1/stores endpoint)
         - Compactor is running and not stuck
         - Query can reach stores
 
         Args:
             cluster: Cluster configuration
             k8s_provider: Kubernetes provider for API access
+            config: Optional service configuration
+            wait_for_stabilization: Whether to wait for store sync
+            stabilization_timeout: Timeout for stabilization wait
 
         Returns:
             CheckResult indicating success/failure
         """
-        logger.info("performing_thanos_post_upgrade_checks", cluster_id=cluster.cluster_id)
+        config = config or DEFAULT_THANOS_CONFIG
+        namespace = _get_namespace(cluster, config)
+
+        logger.info(
+            "performing_thanos_post_upgrade_checks",
+            cluster_id=cluster.cluster_id,
+            namespace=namespace,
+        )
         issues: list[str] = []
         checks_passed: list[str] = []
 
-        namespace = DEFAULT_THANOS_NAMESPACE
-
-        # 1. Check store gateway sync status
-        try:
-            store_pods = await k8s_provider.get_pods(
-                namespace=namespace, label_selector="app.kubernetes.io/name=thanos-store"
+        # 1. Wait for store sync if requested
+        if wait_for_stabilization:
+            logger.info(
+                "waiting_for_thanos_stabilization",
+                timeout=stabilization_timeout,
             )
-            if not store_pods:
-                store_pods = await k8s_provider.get_pods(
-                    namespace=namespace, label_selector="app=thanos-store"
-                )
-
-            if store_pods:
-                # Check if stores are ready (implies block sync is working)
-                ready_stores = [pod for pod in store_pods if pod.ready]
-                if len(ready_stores) == len(store_pods):
-                    checks_passed.append("store_sync")
-                    logger.info("thanos_store_sync_verified", ready_count=len(ready_stores))
-                else:
-                    issues.append(
-                        f"Store gateway sync incomplete: {len(ready_stores)}/{len(store_pods)} ready"
-                    )
-        except Exception as e:
-            logger.warning("store_sync_check_failed", error=str(e))
-            issues.append(f"Failed to verify store sync: {e!s}")
-
-        # 2. Check compactor status
-        try:
-            compactor_pods = await k8s_provider.get_pods(
-                namespace=namespace, label_selector="app.kubernetes.io/name=thanos-compactor"
+            synced = await ThanosOperations.wait_for_store_sync(
+                k8s_provider,
+                namespace=namespace,
+                timeout_seconds=stabilization_timeout,
+                config=config,
             )
-            if not compactor_pods:
-                compactor_pods = await k8s_provider.get_pods(
-                    namespace=namespace, label_selector="app=thanos-compactor"
-                )
-
-            if compactor_pods:
-                ready_compactors = [pod for pod in compactor_pods if pod.ready]
-                if len(ready_compactors) > 0:
-                    checks_passed.append("compactor_running")
-                    logger.info("thanos_compactor_running", ready_count=len(ready_compactors))
-                else:
-                    issues.append("Compactor pods not ready")
+            if synced:
+                checks_passed.append("store_sync_complete")
             else:
-                # Compactor is optional
-                logger.debug("thanos_compactor_not_deployed")
-                checks_passed.append("compactor_optional")
-        except Exception as e:
-            logger.warning("compactor_check_failed", error=str(e))
-            issues.append(f"Failed to check compactor: {e!s}")
+                issues.append("Store sync timed out")
 
-        # 3. Check query connectivity to stores
-        try:
-            query_pods = await k8s_provider.get_pods(
-                namespace=namespace, label_selector="app.kubernetes.io/name=thanos-query"
+        # 2. Check query HTTP readiness endpoint
+        query_config = config.get_component("thanos-query")
+        if query_config:
+            health_config = ServiceHealthConfig(
+                service_name="thanos-query",
+                namespace=namespace,
+                port=query_config.http_port,
+                ready_endpoint=query_config.ready_endpoint,
+                health_endpoint=query_config.health_endpoint,
             )
-            if not query_pods:
-                query_pods = await k8s_provider.get_pods(
-                    namespace=namespace, label_selector="app=thanos-query"
-                )
+            is_healthy, health_msg = await check_service_http_health(
+                k8s_provider, health_config, check_ready=True, check_healthy=True
+            )
+            if is_healthy:
+                checks_passed.append("query_http_ready")
+                logger.info("thanos_query_http_ready")
+            else:
+                issues.append(f"Query HTTP check failed: {health_msg}")
 
-            if query_pods:
-                ready_queries = [pod for pod in query_pods if pod.ready]
-                if len(ready_queries) > 0:
-                    # Query being ready implies it can reach stores
-                    checks_passed.append("query_store_connectivity")
+        # 3. Query stores API to verify store connectivity
+        try:
+            success, store_count, unhealthy_stores = await query_thanos_stores(
+                k8s_provider,
+                namespace=namespace,
+                query_service_name="thanos-query",
+                port=query_config.http_port if query_config else 10902,
+            )
+            if success:
+                if store_count > 0:
+                    checks_passed.append("stores_connected")
                     logger.info(
-                        "thanos_query_connectivity_verified", ready_count=len(ready_queries)
+                        "thanos_stores_connected",
+                        store_count=store_count,
                     )
                 else:
-                    issues.append("Query pods not ready - cannot verify store connectivity")
+                    issues.append("No stores connected to query")
             else:
-                issues.append("No query pods found")
+                issues.append("Failed to query stores API")
         except Exception as e:
-            logger.warning("query_connectivity_check_failed", error=str(e))
-            issues.append(f"Failed to verify query connectivity: {e!s}")
+            logger.warning("stores_query_failed", error=str(e))
+            issues.append(f"Stores API query failed: {e!s}")
 
-        # 4. Optional: Wait for query frontend cache warm-up
-        try:
-            qf_pods = await k8s_provider.get_pods(
-                namespace=namespace, label_selector="app.kubernetes.io/name=thanos-query-frontend"
-            )
-            if not qf_pods:
-                qf_pods = await k8s_provider.get_pods(
-                    namespace=namespace, label_selector="app=thanos-query-frontend"
+        # 4. Check compactor status (optional but important)
+        compactor_config = config.get_component("thanos-compactor")
+        if compactor_config:
+            try:
+                pod_config = PodRetrievalConfig(
+                    component_name="thanos-compactor",
+                    label_selectors=compactor_config.label_selectors,
+                    namespace=namespace,
                 )
+                all_ready, ready_pods, _ = await check_pods_ready(k8s_provider, pod_config)
 
-            if qf_pods:
-                ready_qf = [pod for pod in qf_pods if pod.ready]
-                if len(ready_qf) == len(qf_pods):
-                    checks_passed.append("query_frontend_ready")
-                    logger.info("thanos_query_frontend_ready", ready_count=len(ready_qf))
+                if ready_pods:
+                    if all_ready:
+                        # Check HTTP health
+                        health_config = ServiceHealthConfig(
+                            service_name="thanos-compactor",
+                            namespace=namespace,
+                            port=compactor_config.http_port,
+                            ready_endpoint=compactor_config.ready_endpoint,
+                        )
+                        is_healthy, _ = await check_service_http_health(
+                            k8s_provider, health_config, check_ready=True
+                        )
+                        if is_healthy:
+                            checks_passed.append("compactor_running")
+                            logger.info("thanos_compactor_running")
+                    else:
+                        issues.append("Compactor pods not ready")
                 else:
-                    # Query frontend issues are warnings, not failures
-                    logger.warning(
-                        "thanos_query_frontend_not_fully_ready",
-                        ready=len(ready_qf),
-                        total=len(qf_pods),
-                    )
-            else:
-                logger.debug("thanos_query_frontend_not_deployed")
-        except Exception as e:
-            logger.debug("query_frontend_check_skipped", error=str(e))
+                    logger.debug("thanos_compactor_not_deployed")
+                    checks_passed.append("compactor_optional")
+            except Exception as e:
+                logger.warning("compactor_check_failed", error=str(e))
+                issues.append(f"Failed to check compactor: {e!s}")
+
+        # 5. Check query frontend status (optional)
+        qf_config = config.get_component("thanos-query-frontend")
+        if qf_config:
+            try:
+                pod_config = PodRetrievalConfig(
+                    component_name="thanos-query-frontend",
+                    label_selectors=qf_config.label_selectors,
+                    namespace=namespace,
+                )
+                all_ready, ready_pods, _ = await check_pods_ready(k8s_provider, pod_config)
+
+                if ready_pods:
+                    if all_ready:
+                        health_config = ServiceHealthConfig(
+                            service_name="thanos-query-frontend",
+                            namespace=namespace,
+                            port=qf_config.http_port,
+                            ready_endpoint=qf_config.ready_endpoint,
+                        )
+                        is_healthy, _ = await check_service_http_health(
+                            k8s_provider, health_config, check_ready=True
+                        )
+                        if is_healthy:
+                            checks_passed.append("query_frontend_ready")
+                            logger.info("thanos_query_frontend_ready")
+                    else:
+                        logger.warning("thanos_query_frontend_not_fully_ready")
+                else:
+                    logger.debug("thanos_query_frontend_not_deployed")
+            except Exception as e:
+                logger.debug("query_frontend_check_skipped", error=str(e))
 
         passed = len(issues) == 0
         message = (
@@ -271,27 +364,35 @@ class ThanosOperations:
                 "checks_passed": checks_passed,
                 "issues": issues,
             },
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(UTC),
         )
 
     @staticmethod
     async def wait_for_store_sync(
         k8s_provider: "KubernetesProvider",
-        namespace: str = DEFAULT_THANOS_NAMESPACE,
+        namespace: str | None = None,
         timeout_seconds: int = 300,
         check_interval: int = 10,
+        config: ThanosServiceConfig | None = None,
     ) -> bool:
         """Wait for Thanos store to sync blocks.
 
+        Checks both pod readiness AND HTTP /-/ready endpoint.
+
         Args:
             k8s_provider: Kubernetes provider
-            namespace: Thanos namespace
+            namespace: Thanos namespace (uses config default if not provided)
             timeout_seconds: Maximum wait time
             check_interval: Seconds between checks
+            config: Optional service configuration
 
         Returns:
             True if sync completed, False if timed out
         """
+        config = config or DEFAULT_THANOS_CONFIG
+        namespace = namespace or config.namespace
+        store_config = config.get_component("thanos-store")
+
         logger.info(
             "waiting_for_store_sync",
             namespace=namespace,
@@ -301,21 +402,30 @@ class ThanosOperations:
         elapsed = 0
         while elapsed < timeout_seconds:
             try:
-                store_pods = await k8s_provider.get_pods(
-                    namespace=namespace, label_selector="app.kubernetes.io/name=thanos-store"
+                # Check pod readiness
+                pod_config = PodRetrievalConfig(
+                    component_name="thanos-store",
+                    label_selectors=store_config.label_selectors if store_config else [],
+                    namespace=namespace,
                 )
-                if not store_pods:
-                    store_pods = await k8s_provider.get_pods(
-                        namespace=namespace, label_selector="app=thanos-store"
+                all_ready, ready_pods, _ = await check_pods_ready(k8s_provider, pod_config)
+
+                if ready_pods and all_ready:
+                    # Verify with HTTP health check
+                    health_config = ServiceHealthConfig(
+                        service_name="thanos-store",
+                        namespace=namespace,
+                        port=store_config.http_port if store_config else 10902,
+                    )
+                    is_healthy, _ = await check_service_http_health(
+                        k8s_provider, health_config, check_ready=True
                     )
 
-                if store_pods:
-                    all_ready = all(pod.ready for pod in store_pods)
-                    if all_ready:
+                    if is_healthy:
                         logger.info(
                             "store_sync_completed",
                             elapsed_seconds=elapsed,
-                            pod_count=len(store_pods),
+                            pod_count=len(ready_pods),
                         )
                         return True
 

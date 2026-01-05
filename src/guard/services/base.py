@@ -2,8 +2,9 @@
 
 from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING
+from typing import Any as TypingAny
 
-from guard.core.models import CheckResult, MetricAggregation, ServiceType
+from guard.core.models import CheckResult, ServiceType
 
 if TYPE_CHECKING:
     from guard.checks.check_registry import CheckRegistry
@@ -128,13 +129,15 @@ class BaseService(ABC):
             CheckResult indicating operation success/failure
         """
 
-    def get_metric_aggregations(self) -> dict[str, MetricAggregation]:
+    def get_metric_aggregations(self) -> dict[str, TypingAny]:
         """Get service-specific metric aggregation mappings.
 
         Override in subclass to provide metrics for this service.
+        May return simple MetricAggregation values or complex dicts with
+        query strings, aggregation types, and descriptions.
 
         Returns:
-            Dict mapping metric names to aggregation types
+            Dict mapping metric names to aggregation config
         """
         return {}
 

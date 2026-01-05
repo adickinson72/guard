@@ -1,6 +1,108 @@
 """Thanos service configuration and constants."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
+
+@dataclass
+class ThanosComponentConfig:
+    """Configuration for a Thanos component."""
+
+    name: str
+    label_selectors: list[str] = field(default_factory=list)
+    is_required: bool = False
+    http_port: int = 10902
+    ready_endpoint: str = "/-/ready"
+    health_endpoint: str = "/-/healthy"
+
+    def __post_init__(self) -> None:
+        """Generate default label selectors if none provided."""
+        if not self.label_selectors:
+            self.label_selectors = [
+                f"app.kubernetes.io/name={self.name}",
+                f"app={self.name}",
+                f"app.kubernetes.io/component={self.name.replace('thanos-', '')}",
+            ]
+
+
+@dataclass
+class ThanosServiceConfig:
+    """Configuration for Thanos service operations.
+
+    This configuration allows customization of namespaces, label selectors,
+    and component settings for different Helm chart conventions.
+    """
+
+    namespace: str = "monitoring"
+    components: dict[str, ThanosComponentConfig] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Initialize default component configurations."""
+        if not self.components:
+            self.components = {
+                "thanos-query": ThanosComponentConfig(
+                    name="thanos-query",
+                    is_required=True,
+                    http_port=10902,
+                    label_selectors=[
+                        "app.kubernetes.io/name=thanos-query",
+                        "app=thanos-query",
+                        "app.kubernetes.io/component=query",
+                    ],
+                ),
+                "thanos-store": ThanosComponentConfig(
+                    name="thanos-store",
+                    is_required=True,
+                    http_port=10902,
+                    label_selectors=[
+                        "app.kubernetes.io/name=thanos-store",
+                        "app=thanos-store",
+                        "app.kubernetes.io/component=store",
+                        "app.kubernetes.io/component=storegateway",
+                    ],
+                ),
+                "thanos-compactor": ThanosComponentConfig(
+                    name="thanos-compactor",
+                    is_required=False,
+                    http_port=10902,
+                    label_selectors=[
+                        "app.kubernetes.io/name=thanos-compactor",
+                        "app=thanos-compactor",
+                        "app.kubernetes.io/component=compactor",
+                    ],
+                ),
+                "thanos-query-frontend": ThanosComponentConfig(
+                    name="thanos-query-frontend",
+                    is_required=False,
+                    http_port=10902,
+                    label_selectors=[
+                        "app.kubernetes.io/name=thanos-query-frontend",
+                        "app=thanos-query-frontend",
+                        "app.kubernetes.io/component=query-frontend",
+                    ],
+                ),
+                "thanos-ruler": ThanosComponentConfig(
+                    name="thanos-ruler",
+                    is_required=False,
+                    http_port=10902,
+                ),
+                "thanos-receive": ThanosComponentConfig(
+                    name="thanos-receive",
+                    is_required=False,
+                    http_port=10902,
+                ),
+            }
+
+    def get_component(self, name: str) -> ThanosComponentConfig | None:
+        """Get component configuration by name."""
+        return self.components.get(name)
+
+    def get_required_components(self) -> list[str]:
+        """Get list of required component names."""
+        return [name for name, cfg in self.components.items() if cfg.is_required]
+
+
+# Default configuration instance
+DEFAULT_THANOS_CONFIG = ThanosServiceConfig()
 
 
 @dataclass
